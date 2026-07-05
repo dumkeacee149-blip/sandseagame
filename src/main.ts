@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import "./styles.css";
+import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 
@@ -50,7 +51,6 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 120, 220);
 
 const clock = new THREE.Clock();
-const tempColor = new THREE.Color();
 const tempVec = new THREE.Vector3();
 
 const hemi = new THREE.HemisphereLight("#fff1cf", "#4c2f31", 2.35);
@@ -128,24 +128,6 @@ function box(
   return mesh;
 }
 
-function cyl(
-  radiusTop: number,
-  radiusBottom: number,
-  height: number,
-  radialSegments: number,
-  material: THREE.Material,
-  position: [number, number, number],
-  rotation: [number, number, number] = [0, 0, 0],
-) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments),
-    material,
-  );
-  mesh.position.set(...position);
-  mesh.rotation.set(...rotation);
-  return mesh;
-}
-
 function sandHeight(x: number, z: number, time = 0) {
   const sweep = time * 0.035;
   const broad =
@@ -158,24 +140,82 @@ function sandHeight(x: number, z: number, time = 0) {
   return broad + ripple + basin;
 }
 
-function createTerrain() {
-  const size = 3600;
-  const segments = 150;
-  const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
-  geometry.rotateX(-Math.PI / 2);
+const TERRAIN_SIZE = 3600;
+const TERRAIN_CELL = 24;
+const TERRAIN_STEP = 8;
 
+function quantizedHeight(ix: number, iz: number) {
+  const half = TERRAIN_SIZE / 2;
+  const x = -half + (ix + 0.5) * TERRAIN_CELL;
+  const z = -half + (iz + 0.5) * TERRAIN_CELL;
+  return Math.round(sandHeight(x, z) / TERRAIN_STEP) * TERRAIN_STEP;
+}
+
+// Minecraft 式阶梯方块沙丘：每格一个平顶 + 相邻落差处的垂直壁面
+function createTerrain() {
+  const half = TERRAIN_SIZE / 2;
+  const cells = TERRAIN_SIZE / TERRAIN_CELL;
+  const positions: number[] = [];
   const colors: number[] = [];
-  const positions = geometry.attributes.position;
-  for (let i = 0; i < positions.count; i += 1) {
-    const x = positions.getX(i);
-    const z = positions.getZ(i);
-    const y = sandHeight(x, z, 0);
-    positions.setY(i, y);
-    const dune = THREE.MathUtils.clamp((y + 32) / 76, 0, 1);
-    tempColor.copy(palette.sandLow).lerp(palette.sandHigh, dune);
-    if ((x + z) % 560 > 440) tempColor.lerp(palette.salt, 0.28);
-    colors.push(tempColor.r, tempColor.g, tempColor.b);
+  const topColor = new THREE.Color();
+  const wallColor = new THREE.Color();
+
+  type P = [number, number, number];
+  const pushQuad = (a: P, b: P, c: P, d: P, color: THREE.Color) => {
+    positions.push(...a, ...b, ...c, ...a, ...c, ...d);
+    for (let i = 0; i < 6; i += 1) colors.push(color.r, color.g, color.b);
+  };
+
+  const cellColor = (ix: number, iz: number, h: number, target: THREE.Color) => {
+    const x = -half + (ix + 0.5) * TERRAIN_CELL;
+    const z = -half + (iz + 0.5) * TERRAIN_CELL;
+    const dune = THREE.MathUtils.clamp((h + 32) / 76, 0, 1);
+    target.copy(palette.sandLow).lerp(palette.sandHigh, dune);
+    if ((x + z) % 560 > 440) target.lerp(palette.salt, 0.28);
+    return target;
+  };
+
+  for (let ix = 0; ix < cells; ix += 1) {
+    for (let iz = 0; iz < cells; iz += 1) {
+      const h = quantizedHeight(ix, iz);
+      const x0 = -half + ix * TERRAIN_CELL;
+      const x1 = x0 + TERRAIN_CELL;
+      const z0 = -half + iz * TERRAIN_CELL;
+      const z1 = z0 + TERRAIN_CELL;
+
+      cellColor(ix, iz, h, topColor);
+      pushQuad([x0, h, z0], [x0, h, z1], [x1, h, z1], [x1, h, z0], topColor);
+      wallColor.copy(topColor).multiplyScalar(0.68);
+
+      if (ix + 1 < cells) {
+        const hn = quantizedHeight(ix + 1, iz);
+        if (hn !== h) {
+          const lo = Math.min(h, hn);
+          const hi = Math.max(h, hn);
+          if (h > hn) {
+            pushQuad([x1, hi, z0], [x1, hi, z1], [x1, lo, z1], [x1, lo, z0], wallColor);
+          } else {
+            pushQuad([x1, hi, z1], [x1, hi, z0], [x1, lo, z0], [x1, lo, z1], wallColor);
+          }
+        }
+      }
+      if (iz + 1 < cells) {
+        const hn = quantizedHeight(ix, iz + 1);
+        if (hn !== h) {
+          const lo = Math.min(h, hn);
+          const hi = Math.max(h, hn);
+          if (h > hn) {
+            pushQuad([x1, hi, z1], [x0, hi, z1], [x0, lo, z1], [x1, lo, z1], wallColor);
+          } else {
+            pushQuad([x0, hi, z1], [x1, hi, z1], [x1, lo, z1], [x0, lo, z1], wallColor);
+          }
+        }
+      }
+    }
   }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
 
@@ -187,7 +227,7 @@ function createTerrain() {
     }),
   );
 
-  return { terrain, geometry };
+  return { terrain };
 }
 
 const { terrain } = createTerrain();
@@ -230,17 +270,19 @@ scene.add(createSkyDome());
 function createSunAndMoons() {
   const group = new THREE.Group();
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(44, 24, 12),
+    new THREE.BoxGeometry(88, 88, 8),
     basicMat("sun", "#ffe0a7"),
   );
   sun.position.set(-760, 560, -840);
+  sun.lookAt(0, 120, 0);
   group.add(sun);
 
   const moon = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(26, 1),
+    new THREE.BoxGeometry(52, 52, 6),
     basicMat("moon", "#dff8ff", { transparent: true, opacity: 0.86 }),
   );
   moon.position.set(620, 440, -980);
+  moon.lookAt(0, 120, 0);
   group.add(moon);
   return group;
 }
@@ -260,11 +302,10 @@ function createCloudBank() {
     const puffs = 3 + Math.floor(Math.random() * 4);
     for (let j = 0; j < puffs; j += 1) {
       const puff = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(26 + Math.random() * 28, 1),
+        new THREE.BoxGeometry(64 + Math.random() * 56, 10, 40 + Math.random() * 26),
         cloudMaterial,
       );
-      puff.scale.set(1.7 + Math.random() * 1.5, 0.36 + Math.random() * 0.2, 0.72);
-      puff.position.set(j * 42, Math.random() * 12, Math.random() * 26);
+      puff.position.set(j * 52, Math.floor(Math.random() * 2) * 10, Math.random() * 26);
       cloud.add(puff);
     }
     cloud.position.set(
@@ -309,84 +350,16 @@ function createSandLines() {
 
 scene.add(createSandLines());
 
-function createSailShape(width: number, height: number) {
-  const shape = new THREE.Shape();
-  shape.moveTo(-width * 0.48, -height * 0.48);
-  shape.lineTo(width * 0.42, -height * 0.35);
-  shape.lineTo(width * 0.12, height * 0.52);
-  shape.lineTo(-width * 0.48, -height * 0.48);
-  return new THREE.ShapeGeometry(shape);
-}
-
-function createSandSkiff() {
-  const group = new THREE.Group();
-  const wood = mat("skiff-wood", palette.wood);
-  const darkWood = mat("skiff-dark-wood", palette.darkWood);
-  const brass = mat("skiff-brass", palette.brass);
-  const cloth = mat("skiff-cloth", palette.cloth, { side: THREE.DoubleSide });
-  const teal = mat("skiff-teal", palette.teal, {
-    emissive: palette.teal,
-    emissiveIntensity: 0.15,
-  });
-
-  group.add(box(74, 13, 28, wood, [0, 12, 0]));
-  group.add(box(56, 9, 22, darkWood, [-7, 22, 0]));
-  group.add(box(34, 7, 20, wood, [36, 14, 0], [0, 0, -0.22]));
-  group.add(box(25, 6, 18, wood, [-45, 13, 0], [0, 0, 0.28]));
-  group.add(cyl(2.4, 2.4, 104, 8, darkWood, [0, 4, -20], [0, 0, Math.PI / 2]));
-  group.add(cyl(2.4, 2.4, 104, 8, darkWood, [0, 4, 20], [0, 0, Math.PI / 2]));
-  group.add(cyl(1.6, 1.6, 56, 8, brass, [-18, 12, -27], [Math.PI / 2, 0, 0]));
-  group.add(cyl(1.6, 1.6, 56, 8, brass, [-18, 12, 27], [Math.PI / 2, 0, 0]));
-  group.add(cyl(3.1, 3.5, 84, 8, darkWood, [2, 56, 0]));
-  group.add(cyl(1.6, 1.6, 70, 8, darkWood, [0, 62, 0], [0, 0, Math.PI / 2]));
-
-  const mainSail = new THREE.Mesh(createSailShape(70, 78), cloth);
-  mainSail.position.set(2, 61, 0);
-  mainSail.rotation.set(0.06, Math.PI / 2, -0.05);
-  group.add(mainSail);
-
-  const frontSail = new THREE.Mesh(createSailShape(38, 42), cloth);
-  frontSail.position.set(43, 42, 0);
-  frontSail.rotation.set(-0.04, Math.PI / 2, 0.15);
-  group.add(frontSail);
-
-  group.add(box(13, 10, 12, teal, [-16, 29, -2]));
-  group.add(box(10, 8, 10, brass, [18, 29, 10]));
-  group.add(box(8, 8, 8, darkWood, [17, 28, -13]));
-
-  const flag = new THREE.Mesh(createSailShape(18, 16), cloth);
-  flag.position.set(-6, 104, 0);
-  flag.rotation.set(0, Math.PI / 2, 0.4);
-  group.add(flag);
-
-  group.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.castShadow = false;
-      object.receiveShadow = false;
-    }
-  });
-
-  return group;
-}
-
-const ship = createSandSkiff();
+const ship = createVoxelAsset("A01");
+ship.scale.setScalar(9);
 scene.add(ship);
 
 function createPalm(position: THREE.Vector3, scale = 1) {
-  const group = new THREE.Group();
-  group.position.copy(position);
-  group.scale.setScalar(scale);
-  group.add(cyl(4, 5.6, 58, 7, mat("palm-trunk", "#7a4c2e"), [0, 29, 0], [0.1, 0.05, -0.15]));
-
-  const leafMaterial = mat("palm-leaf", "#2d8f6a");
-  for (let i = 0; i < 8; i += 1) {
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(6, 46, 4), leafMaterial);
-    leaf.position.set(0, 61, 0);
-    leaf.rotation.set(Math.PI / 2.4, (i / 8) * Math.PI * 2, 0.18);
-    leaf.translateY(18);
-    group.add(leaf);
-  }
-  return group;
+  const palm = createVoxelAsset("A04");
+  palm.position.copy(position);
+  palm.scale.setScalar(11 * scale);
+  palm.rotation.y = Math.random() * Math.PI * 2;
+  return palm;
 }
 
 function createOasisPort() {
@@ -394,28 +367,25 @@ function createOasisPort() {
   group.position.set(-520, 0, -380);
 
   const water = new THREE.Mesh(
-    new THREE.CircleGeometry(96, 28),
+    new THREE.BoxGeometry(168, 3, 132),
     new THREE.MeshBasicMaterial({
       color: palette.oasis,
       transparent: true,
       opacity: 0.72,
-      side: THREE.DoubleSide,
     }),
   );
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = sandHeight(group.position.x, group.position.z) + 1.2;
+  water.position.y = 1.4;
   group.add(water);
 
   const dockMat = mat("dock", "#5f3724");
   group.add(box(190, 9, 24, dockMat, [18, 12, 108], [0, -0.16, 0]));
   group.add(box(90, 8, 26, dockMat, [-88, 13, 54], [0, 0.72, 0]));
 
-  const tentMat = mat("tent-red", "#b23b35");
-  const tentRoof = new THREE.Mesh(new THREE.ConeGeometry(38, 28, 4), tentMat);
-  tentRoof.position.set(-124, 31, -28);
-  tentRoof.rotation.y = Math.PI / 4;
-  group.add(tentRoof);
-  group.add(box(58, 20, 42, mat("tent-base", "#d0b07c"), [-124, 14, -28]));
+  const tent = createVoxelAsset("A03");
+  tent.scale.setScalar(11);
+  tent.position.set(-124, 0, -28);
+  tent.rotation.y = Math.PI / 5;
+  group.add(tent);
 
   for (let i = 0; i < 7; i += 1) {
     const angle = (i / 7) * Math.PI * 2;
@@ -429,13 +399,19 @@ function createOasisPort() {
     group.add(box(14, 12, 14, mat("crate", "#8a5a35"), [-82 + i * 22, 17, 92 + (i % 2) * 20]));
   }
 
-  group.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.position.y += sandHeight(group.position.x + object.position.x, group.position.z + object.position.z);
-    }
-  });
+  groundChildren(group);
 
   return group;
+}
+
+// 只按顶层子节点贴地，避免拆散体素资产的内部结构
+function groundChildren(group: THREE.Group) {
+  group.children.forEach((child) => {
+    child.position.y += sandHeight(
+      group.position.x + child.position.x,
+      group.position.z + child.position.z,
+    );
+  });
 }
 
 scene.add(createOasisPort());
@@ -443,42 +419,30 @@ scene.add(createOasisPort());
 function createRuins() {
   const group = new THREE.Group();
   group.position.set(650, 0, 280);
-  const stone = mat("ruin-stone", "#9b9075");
-  const darkStone = mat("ruin-dark", palette.basalt);
-  const glow = mat("rune-glow", palette.glow, {
-    emissive: palette.glow,
-    emissiveIntensity: 0.8,
+
+  const gate = createVoxelAsset("A05");
+  gate.scale.setScalar(18);
+  gate.position.set(0, 0, -30);
+  group.add(gate);
+
+  const obeliskSpots: Array<[number, number, number, number]> = [
+    [-150, 90, 13, 0.6],
+    [150, 60, 10, 2.1],
+    [60, -160, 15, 3.6],
+  ];
+  obeliskSpots.forEach(([x, z, scale, rotY]) => {
+    const obelisk = createVoxelAsset("A06");
+    obelisk.scale.setScalar(scale);
+    obelisk.position.set(x, 0, z);
+    obelisk.rotation.y = rotY;
+    group.add(obelisk);
   });
-
-  for (let i = 0; i < 6; i += 1) {
-    const x = -120 + i * 48;
-    const h = 78 + (i % 3) * 22;
-    group.add(cyl(10, 12, h, 6, stone, [x, h / 2, -40], [0, 0, (i - 2) * 0.04]));
-  }
-
-  group.add(box(250, 28, 32, stone, [0, 112, -42], [0, 0, -0.05]));
-  group.add(box(58, 130, 36, darkStone, [-160, 72, 58], [0, 0.12, 0.1]));
-  group.add(box(58, 130, 36, darkStone, [160, 72, 58], [0, -0.1, -0.08]));
-  group.add(box(250, 26, 36, darkStone, [0, 146, 58], [0, 0, 0.04]));
-
-  for (let i = 0; i < 9; i += 1) {
-    group.add(box(5, 18, 4, glow, [-115 + i * 28, 72 + (i % 2) * 18, 37]));
-  }
-
-  const obelisk = new THREE.Mesh(new THREE.ConeGeometry(24, 148, 4), stone);
-  obelisk.position.set(80, 80, -148);
-  obelisk.rotation.set(0.12, Math.PI / 4, -0.08);
-  group.add(obelisk);
 
   const light = new THREE.PointLight("#69f1df", 2.8, 360);
   light.position.set(0, 78, 24);
   group.add(light);
 
-  group.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.position.y += sandHeight(group.position.x + object.position.x, group.position.z + object.position.z) - 26;
-    }
-  });
+  groundChildren(group);
 
   return group;
 }
@@ -489,11 +453,11 @@ function createSaltFlats() {
   const group = new THREE.Group();
   const saltMat = mat("salt-flat", palette.salt);
   for (let i = 0; i < 9; i += 1) {
-    const shard = new THREE.Mesh(new THREE.CylinderGeometry(34, 44, 7, 6), saltMat);
+    const shard = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
     const x = 180 + THREE.MathUtils.randFloatSpread(350);
     const z = 680 + THREE.MathUtils.randFloatSpread(240);
     shard.position.set(x, sandHeight(x, z) + 1, z);
-    shard.rotation.y = Math.random() * Math.PI;
+    shard.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
     group.add(shard);
   }
   return group;
@@ -502,44 +466,10 @@ function createSaltFlats() {
 scene.add(createSaltFlats());
 
 function createWorm() {
-  const group = new THREE.Group();
-  group.position.set(760, 0, -680);
-  const bodyMat = mat("worm-body", "#7a2d2f");
-  const bellyMat = mat("worm-belly", "#d7b47b");
-
-  for (let i = 0; i < 16; i += 1) {
-    const segment = new THREE.Mesh(new THREE.IcosahedronGeometry(22 - i * 0.55, 1), bodyMat);
-    segment.position.set(-i * 24, 18 + Math.sin(i * 0.7) * 14, Math.sin(i * 0.4) * 18);
-    segment.scale.set(1.35, 0.74, 0.9);
-    segment.name = `worm-segment-${i}`;
-    group.add(segment);
-  }
-
-  const head = new THREE.Mesh(new THREE.ConeGeometry(32, 60, 7), bodyMat);
-  head.position.set(28, 34, 0);
-  head.rotation.z = -Math.PI / 2;
-  group.add(head);
-
-  const jaw = new THREE.Mesh(new THREE.ConeGeometry(18, 34, 5), bellyMat);
-  jaw.position.set(52, 28, 0);
-  jaw.rotation.z = -Math.PI / 2;
-  group.add(jaw);
-
-  const dust = new THREE.Mesh(
-    new THREE.TorusGeometry(52, 7, 6, 28),
-    basicMat("worm-dust", "#d8a15f", { transparent: true, opacity: 0.36 }),
-  );
-  dust.position.set(-58, 4, 0);
-  dust.rotation.x = Math.PI / 2;
-  group.add(dust);
-
-  group.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.position.y += sandHeight(group.position.x + object.position.x, group.position.z + object.position.z);
-    }
-  });
-
-  return group;
+  const worm = createVoxelAsset("A07");
+  worm.scale.setScalar(16);
+  worm.position.set(760, sandHeight(760, -680), -680);
+  return worm;
 }
 
 const worm = createWorm();
@@ -547,19 +477,13 @@ scene.add(worm);
 
 function createDistantCaravans() {
   const group = new THREE.Group();
-  const cloth = mat("caravan-cloth", "#294c5b");
-  const wood = mat("caravan-wood", "#634127");
 
-  for (let i = 0; i < 9; i += 1) {
-    const caravan = new THREE.Group();
-    caravan.add(box(38, 10, 18, wood, [0, 9, 0]));
-    const sail = new THREE.Mesh(createSailShape(22, 36), cloth);
-    sail.position.set(2, 31, 0);
-    sail.rotation.y = Math.PI / 2;
-    caravan.add(sail);
-    const x = -780 + i * 84;
+  for (let i = 0; i < 7; i += 1) {
+    const caravan = createVoxelAsset("A10");
+    caravan.scale.setScalar(8);
+    const x = -780 + i * 108;
     const z = 560 + Math.sin(i) * 34;
-    caravan.position.set(x, sandHeight(x, z) + 2, z);
+    caravan.position.set(x, sandHeight(x, z), z);
     caravan.rotation.y = -0.58;
     group.add(caravan);
   }
@@ -613,7 +537,7 @@ function updateShip(delta: number, elapsed: number) {
   shipState.position.x = THREE.MathUtils.clamp(shipState.position.x, -1420, 1420);
   shipState.position.z = THREE.MathUtils.clamp(shipState.position.z, -1420, 1420);
   shipState.position.y =
-    sandHeight(shipState.position.x, shipState.position.z) + 18 + Math.sin(elapsed * 4) * 0.9;
+    sandHeight(shipState.position.x, shipState.position.z) + 1.2 + Math.sin(elapsed * 4) * 0.9;
 
   ship.position.copy(shipState.position);
   ship.rotation.y = shipState.heading;
@@ -637,12 +561,8 @@ function updateWorm(elapsed: number) {
   worm.position.x = 760 + Math.sin(elapsed * 0.16) * 92;
   worm.position.z = -680 + Math.cos(elapsed * 0.12) * 68;
   worm.rotation.y = Math.sin(elapsed * 0.18) * 0.3;
-  worm.children.forEach((child, index) => {
-    if (child.name.startsWith("worm-segment")) {
-      child.position.y += Math.sin(elapsed * 1.8 + index * 0.72) * 0.07;
-      child.rotation.z = Math.sin(elapsed * 1.4 + index) * 0.08;
-    }
-  });
+  worm.position.y =
+    sandHeight(worm.position.x, worm.position.z) + Math.sin(elapsed * 1.4) * 3 - 2;
 }
 
 function updateHud() {

@@ -1,0 +1,36 @@
+[    2670ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[    2670ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[    3066ms] [WARNING] THREE.Renderer: "renderAsync()" has been deprecated. Use "render()" and "await renderer.init();" when creating the renderer. @ https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.core.min.js:5
+[    4067ms] [LOG] [Water] Three.js Water Pro ready — backend: webgpu, seed: 42, deterministic @ 60Hz @ https://arrr.fun/game.min.js?v=1783223805690:0
+[   34615ms] [LOG] [perf] pipeline retention installed (cap 1500) @ https://arrr.fun/game.min.js?v=1783223805690:992
+[   34800ms] [WARNING] THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead. @ https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.core.min.js:5
+[   35168ms] [WARNING] THREE.TSL: Vertex attribute "normal" not found on geometry. Stack trace not available. Enable "THREE.Node.captureStackTrace" to capture stack traces. @ https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.core.min.js:5
+[   35171ms] [WARNING] THREE.AttributeNode: Vertex attribute "position" not found on geometry. @ https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.core.min.js:5
+[   35400ms] [LOG] [Water] Three.js Water Pro ready — backend: webgpu, seed: 42, deterministic @ 60Hz @ https://arrr.fun/game.min.js?v=1783223805690:0
+[   35402ms] [INFO] [auto-quality] step 2/5: scale 1, water high, vegetation medium, ground medium @ https://arrr.fun/game.min.js?v=1783223805690:992
+[   35410ms] [LOG] [NetClient] Connected to wss://arrr.fun/ws @ https://arrr.fun/game.min.js?v=1783223805690:516
+[   35410ms] [LOG] [Net] Connected to server @ https://arrr.fun/game.min.js?v=1783223805690:998
+[   37186ms] [WARNING] [perf] long frame {"totalMs":439.4,"gameMs":22.2,"waterMs":118.4,"renderMs":298.8,"batch":{"groups":26,"batchedParts":800,"uniqueGeometries":49,"instanceCapacity":32768,"drawCalls":1,"lodSynced":26,"lodSkipped":0,"geomAdds":49,"grows":0,"msSinceGeomAdd":419,"msSinceGrow":-1},"renderCalls":39,"pipelinesAdded":27,"pipelinesTotal":72,"grass":{"tiles":0,"blades":0,"capacityTiles":0,"lodLowChunks":0,"lastScanMs":0,"lastBuilds":0}} @ https://arrr.fun/game.min.js?v=1783223805690:992
+[   37203ms] [LOG] [Net] Spawned at server position: (669, 10, 28) → groundH: 10.2 @ https://arrr.fun/game.min.js?v=1783223805690:515
+[   37203ms] [LOG] [Net] Welcome! Player ID: 36704, Seed: 42 @ https://arrr.fun/game.min.js?v=1783223805690:515
+[   39721ms] [WARNING] [perf] long frame {"totalMs":2519.1,"gameMs":2479,"waterMs":21.5,"renderMs":18.6,"batch":{"groups":301,"batchedParts":9239,"uniqueGeometries":168,"instanceCapacity":32768,"drawCalls":1,"lodSynced":283,"lodSkipped":18,"geomAdds":168,"grows":0,"msSinceGeomAdd":41,"msSinceGrow":-1},"renderCalls":46,"pipelinesAdded":11,"pipelinesTotal":83,"grass":{"tiles":0,"blades":0,"capacityTiles":0,"lodLowChunks":0,"lastScanMs":0,"lastBuilds":0}} @ https://arrr.fun/game.min.js?v=1783223805690:992
+[   41863ms] [LOG] [perf] pipeline pre-warm (+3000ms) complete @ https://arrr.fun/game.min.js?v=1783223805690:1013
+[   48772ms] [LOG] [perf] pipeline pre-warm (+12000ms) complete @ https://arrr.fun/game.min.js?v=1783223805690:1013
+[   62106ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[   62106ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[   66774ms] [LOG] [perf] pipeline pre-warm (+30000ms) complete @ https://arrr.fun/game.min.js?v=1783223805690:1013
+[  117906ms] [WARNING] [Water] More than 48 wave sample handles; extra handles stay at WATER_LEVEL @ https://arrr.fun/game.min.js?v=1783223805690:0
+[  122107ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  122107ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  182095ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  182095ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  242086ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  242086ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  302105ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  302105ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  362091ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  362091ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  367317ms] [WARNING] [perf] long frame {"totalMs":384.1,"gameMs":5.3,"waterMs":376,"renderMs":2.8,"batch":{"groups":230,"batchedParts":6314,"uniqueGeometries":200,"instanceCapacity":32768,"drawCalls":1,"lodSynced":80,"lodSkipped":150,"geomAdds":200,"grows":0,"msSinceGeomAdd":22466,"msSinceGrow":-1},"renderCalls":128968,"pipelinesAdded":0,"pipelinesTotal":235,"grass":{"tiles":0,"blades":0,"capacityTiles":0,"lodLowChunks":0,"lastScanMs":0,"lastBuilds":0}} @ https://arrr.fun/game.min.js?v=1783223805690:992
+[  422094ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  422094ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  445703ms] [WARNING] [ENTITY_JUMP] id=36983 jump=16.1 from=(365,-350) to=(349,-351) tick=398116 snaps=10 @ https://arrr.fun/game.min.js?v=1783223805690:515
