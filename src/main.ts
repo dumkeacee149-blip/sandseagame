@@ -30,6 +30,8 @@ import {
   startAttack,
 } from "./game/player";
 import { updateHud } from "./ui/hud";
+import { getState, setState } from "./game/store";
+import { addGold } from "./game/economy";
 import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -136,8 +138,7 @@ function boardShip() {
   player.visible = false;
 }
 
-// 劈碎货箱：碎木屑飞溅 + 战利品计数（真实数据取代 HUD 假数字的第一步）
-let salvage = 0;
+// 劈碎货箱的战利品直接进金库（+2 gold/箱）
 
 type Splinter = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number };
 const splinters: Splinter[] = [];
@@ -190,7 +191,7 @@ function tryBreakCrates() {
     if (crateWorldPos.distanceTo(hitProbe) < 24) {
       crate.visible = false;
       spawnSplinters(crateWorldPos);
-      salvage += 1;
+      setState(addGold(getState(), 2));
     }
   }
 }
@@ -223,7 +224,7 @@ if (import.meta.env.DEV) {
     },
     getMode: () => mode,
     getPlayerY: () => playerState.position.y,
-    getSalvage: () => salvage,
+    getState,
     goAshore,
     boardShip,
   };
@@ -254,7 +255,7 @@ function animate() {
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
-  updateHud(shipState.speed, elapsed, ship.position, salvage);
+  updateHud(getState(), shipState.speed, ship.position);
   renderer.render(scene, camera);
 }
 
