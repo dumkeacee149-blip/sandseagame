@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import "./styles.css";
 import { palette } from "./core/palette";
-import { initInput } from "./core/input";
+import { initInput, consumePressed, clearFramePresses } from "./core/input";
 import { hunyuanSlot } from "./core/models";
 import { createTerrain } from "./world/sand";
 import {
@@ -20,6 +20,7 @@ import {
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
 import { shipState, updateShip, updateCamera } from "./game/ship-controller";
+import { playerState, createPlayerAvatar, updatePlayer, updateWalkCamera } from "./game/player";
 import { updateHud } from "./ui/hud";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -90,6 +91,43 @@ scene.add(createDistantCaravans());
 const windParticles = createWindParticles();
 scene.add(windParticles);
 
+// 玩家小人：航行时隐藏，下船后现身（贴近 ARRR 的上岸/上船切换）
+const player = createPlayerAvatar();
+player.visible = false;
+scene.add(player);
+
+type PlayMode = "sailing" | "walking";
+let mode: PlayMode = "sailing";
+
+const actionEl = document.querySelector("#action");
+
+function setAction(text: string | null) {
+  if (!actionEl) return;
+  if (text) {
+    actionEl.textContent = text;
+    actionEl.classList.add("visible");
+  } else {
+    actionEl.classList.remove("visible");
+  }
+}
+
+function goAshore() {
+  mode = "walking";
+  playerState.position.set(
+    shipState.position.x + Math.cos(shipState.heading) * 36,
+    0,
+    shipState.position.z - Math.sin(shipState.heading) * 36,
+  );
+  playerState.heading = shipState.heading;
+  playerState.speed = 0;
+  player.visible = true;
+}
+
+function boardShip() {
+  mode = "sailing";
+  player.visible = false;
+}
+
 function onResize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -110,14 +148,36 @@ if (import.meta.env.DEV) {
       shipState.speed = 0;
       shipState.targetSpeed = 0;
     },
+    teleportPlayer(x: number, z: number, heading?: number) {
+      playerState.position.set(x, 0, z);
+      if (heading !== undefined) playerState.heading = heading;
+      playerState.speed = 0;
+    },
+    getMode: () => mode,
+    goAshore,
+    boardShip,
   };
 }
 
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
-  updateShip(ship, delta, elapsed);
-  updateCamera(camera, ship, delta);
+
+  if (mode === "sailing") {
+    updateShip(ship, delta, elapsed);
+    updateCamera(camera, ship, delta);
+    const canGoAshore = Math.abs(shipState.speed) < 8;
+    setAction(canGoAshore ? "Press E to go ashore" : null);
+    if (canGoAshore && consumePressed("KeyE")) goAshore();
+  } else {
+    updatePlayer(player, delta, elapsed);
+    updateWalkCamera(camera, player, delta);
+    const nearShip = player.position.distanceTo(ship.position) < 60;
+    setAction(nearShip ? "Press E to board the skiff" : null);
+    if (nearShip && consumePressed("KeyE")) boardShip();
+  }
+  clearFramePresses();
+
   updateWorm(worm, elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
