@@ -1,10 +1,40 @@
+/* ============================================================
+   Sandsea Privateers — “船长的航海桌”设计系统
+   仪表（HUD/小地图/交易所）= 深色木牌 + 黄铜铆钉
+   文档（任务日志）= 羊皮纸卷轴
+   语音（聊天）= 直接落在世界上的墨字，不加盒子
+   ============================================================ */
+
+@font-face {
+  font-family: "Pirata One";
+  src: url("/fonts/pirata-one.woff2") format("woff2");
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  background: #10101a;
-  color: #f8edd6;
+  /* 墨、木、羊皮纸、黄铜、遗物青、危险红 —— 全部偏暖，无纯黑纯白 */
+  --ink: #241708;
+  --ink-soft: rgba(36, 23, 8, 0.82);
+  --wood: #3a2817;
+  --wood-deep: #2b1d10;
+  --parchment: #efe3c2;
+  --parchment-deep: #e2d2a8;
+  --parchment-ink: #4a3416;
+  --brass: #c9973e;
+  --brass-bright: #ecc06a;
+  --brass-dim: rgba(201, 151, 62, 0.55);
+  --cream: #f6ecd2;
+  --relic: #4fc3b4;
+  --danger: #c8442f;
+  --wax: #a2372a;
+
+  --display: "Pirata One", "Iowan Old Style", Georgia, serif;
+  --body: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+
+  font-family: var(--body);
+  background: var(--wood-deep);
+  color: var(--cream);
 }
 
 * {
@@ -19,17 +49,35 @@ body {
   overflow: hidden;
 }
 
-body {
-  background:
-    radial-gradient(circle at 18% 8%, rgba(71, 171, 164, 0.24), transparent 24rem),
-    linear-gradient(180deg, #202746 0%, #6d89a6 44%, #e6ad69 100%);
-}
-
 #game {
   display: block;
   width: 100vw;
   height: 100vh;
   touch-action: none;
+}
+
+/* ---------- 木牌基底：仪表类面板共用的物件感 ---------- */
+/* 木纹 + 双层描边（外黄铜、内暗线）+ 四角铆钉 */
+.plaque,
+.brand-strip,
+.route-chip,
+.action-chip,
+.trade-panel,
+.game-modal {
+  background:
+    radial-gradient(circle 3px at 9px 9px, var(--brass-bright) 2px, rgba(0, 0, 0, 0.35) 2.6px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 9px) 9px, var(--brass-bright) 2px, rgba(0, 0, 0, 0.35) 2.6px, transparent 3.4px),
+    radial-gradient(circle 3px at 9px calc(100% - 9px), var(--brass-bright) 2px, rgba(0, 0, 0, 0.35) 2.6px, transparent 3.4px),
+    radial-gradient(circle 3px at calc(100% - 9px) calc(100% - 9px), var(--brass-bright) 2px, rgba(0, 0, 0, 0.35) 2.6px, transparent 3.4px),
+    repeating-linear-gradient(94deg, rgba(255, 226, 166, 0.05) 0 2px, transparent 2px 7px),
+    linear-gradient(172deg, rgba(74, 51, 28, 0.96), rgba(43, 29, 16, 0.96));
+  border: 2px solid var(--brass-dim);
+  box-shadow:
+    inset 0 0 0 1px rgba(24, 14, 5, 0.9),
+    inset 0 1px 0 rgba(255, 226, 166, 0.14),
+    0 6px 0 rgba(24, 14, 5, 0.55),
+    0 14px 30px rgba(15, 8, 2, 0.45);
+  border-radius: 6px;
 }
 
 .hud {
@@ -39,319 +87,203 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: clamp(16px, 3vw, 32px);
+  padding: clamp(14px, 2.4vw, 26px);
 }
 
+/* ---------- 顶部铭牌 ---------- */
 .brand-strip {
   align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: clamp(16px, 3vw, 32px);
-  max-width: min(760px, calc(100vw - 32px));
-  padding: 14px 18px;
-  border: 1px solid rgba(248, 237, 214, 0.2);
-  background: linear-gradient(110deg, rgba(15, 14, 22, 0.72), rgba(37, 28, 32, 0.52));
-  box-shadow: 0 18px 50px rgba(13, 11, 18, 0.28);
-  backdrop-filter: blur(14px);
+  gap: clamp(14px, 2.4vw, 26px);
+  padding: 10px 18px 12px;
 }
 
 .eyebrow {
-  margin: 0 0 4px;
-  color: #66dbcf;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0;
+  margin: 0;
+  color: var(--brass);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 h1 {
   margin: 0;
-  color: #fff9e8;
-  font-size: clamp(1.35rem, 2.2vw, 2.1rem);
+  font-family: var(--display);
+  font-weight: 400;
+  color: var(--cream);
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
   line-height: 1;
-  letter-spacing: 0;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 0 rgba(24, 14, 5, 0.8);
 }
 
+/* 状态数值：一条木牌里的四格仪表，黄铜分隔线（不是四个小盒子） */
 .stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(74px, 1fr));
-  gap: 8px;
-  min-width: min(340px, 42vw);
+  display: flex;
+  align-items: stretch;
 }
 
-.stat-grid span {
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid rgba(102, 219, 207, 0.18);
-  background: rgba(24, 33, 45, 0.46);
-  color: #d6c8af;
-  font-size: 0.72rem;
-  line-height: 1.15;
+.stat-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 16px;
+  border-left: 1px solid rgba(201, 151, 62, 0.32);
+  white-space: nowrap;
 }
 
-.stat-grid b {
-  display: block;
-  color: #fff8e7;
-  font-size: 1rem;
+.stat-chip:first-child {
+  border-left: none;
 }
 
+.stat-chip i {
+  align-self: center;
+  display: inline-flex;
+  font-style: normal;
+  color: var(--brass);
+}
+
+.stat-chip i svg {
+  width: 15px;
+  height: 15px;
+}
+
+.stat-chip b {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 0 rgba(24, 14, 5, 0.7);
+}
+
+.stat-chip em {
+  font-style: normal;
+  font-size: 0.6rem;
+  color: rgba(246, 236, 210, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.stat-gold b {
+  color: var(--brass-bright);
+}
+
+.stat-hull b {
+  color: #9fd489;
+}
+
+.stat-hull.hull-low b {
+  color: #ff8b6d;
+}
+
+.stat-hull.hull-low i {
+  color: var(--danger);
+  animation: hull-pulse 1.05s ease-in-out infinite;
+}
+
+@keyframes hull-pulse {
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+/* ---------- 底部航向牌 ---------- */
 .route-chip {
   align-self: center;
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: calc(100vw - 32px);
-  margin-bottom: max(8px, env(safe-area-inset-bottom));
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 248, 231, 0.2);
-  background: rgba(16, 16, 26, 0.58);
-  box-shadow: 0 12px 38px rgba(13, 11, 18, 0.22);
-  color: #f8edd6;
-  font-size: clamp(0.78rem, 1.8vw, 0.94rem);
+  padding: 7px 18px 8px;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  color: var(--parchment);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  backdrop-filter: blur(12px);
 }
 
 .route-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: #d23e37;
-  box-shadow: 0 0 0 4px rgba(210, 62, 55, 0.18), 0 0 18px #f2bd73;
+  background: var(--brass-bright);
+  box-shadow: 0 0 0 3px rgba(201, 151, 62, 0.25);
 }
 
-@media (max-width: 720px) {
-  .brand-strip {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-    padding: 13px;
-  }
-
-  .stat-grid {
-    width: 100%;
-    min-width: 0;
-  }
-}
-
+/* ---------- 动作提示 ---------- */
 .action-chip {
   position: fixed;
-  bottom: 108px;
+  bottom: 104px;
   left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 233, 184, 0.25);
-  background: rgba(24, 18, 12, 0.78);
-  color: #ffe9b8;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  translate: -50% 6px;
+  padding: 9px 22px 10px;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  color: var(--brass-bright);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.16s ease, translate 0.16s ease;
   pointer-events: none;
-  backdrop-filter: blur(12px);
+  z-index: 11;
 }
 
 .action-chip.visible {
   opacity: 1;
+  translate: -50% 0;
 }
 
+/* ---------- 小地图：黄铜舷窗 ---------- */
 .minimap {
   position: fixed;
-  top: 18px;
-  right: 18px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 233, 184, 0.3);
-  box-shadow: 0 8px 26px rgba(20, 10, 0, 0.35);
+  top: 16px;
+  right: 16px;
+  border: 3px solid var(--brass-dim);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 1px rgba(24, 14, 5, 0.9),
+    0 0 0 1px rgba(24, 14, 5, 0.7),
+    0 10px 24px rgba(15, 8, 2, 0.5);
   pointer-events: none;
 }
 
-.trade-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(430px, calc(100vw - 40px));
-  padding: 18px 20px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 233, 184, 0.28);
-  background: rgba(22, 16, 11, 0.92);
-  color: #f8edd6;
-  backdrop-filter: blur(14px);
-  z-index: 20;
-}
-
-.trade-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 14px;
-}
-
-.trade-eyebrow {
-  margin: 0;
-  color: #7ce8d8;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.trade-stats {
-  margin: 4px 0 0;
-  font-size: 0.95rem;
-}
-
-.trade-close {
-  border: none;
-  border-radius: 8px;
-  padding: 6px 10px;
-  background: rgba(255, 233, 184, 0.12);
-  color: #f8edd6;
-  cursor: pointer;
-}
-
-.trade-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 0;
-  border-top: 1px solid rgba(255, 233, 184, 0.1);
-}
-
-.trade-good b {
-  display: block;
-  font-size: 0.95rem;
-}
-
-.trade-good span {
-  color: rgba(248, 237, 214, 0.6);
-  font-size: 0.78rem;
-}
-
-.trade-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.trade-actions button {
-  border: 1px solid rgba(124, 232, 216, 0.35);
-  border-radius: 8px;
-  padding: 6px 9px;
-  background: rgba(124, 232, 216, 0.12);
-  color: #cdf6ee;
-  font-size: 0.76rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.trade-actions button[data-action="sell"] {
-  border-color: rgba(255, 200, 120, 0.35);
-  background: rgba(255, 200, 120, 0.1);
-  color: #ffe2b0;
-}
-
-.trade-actions button:disabled {
-  opacity: 0.32;
-  cursor: default;
-}
-
-.trade-na {
-  color: rgba(248, 237, 214, 0.3);
-  padding: 0 20px;
-}
-
-.trade-hint {
-  margin: 12px 0 0;
-  text-align: center;
-  color: rgba(248, 237, 214, 0.5);
-  font-size: 0.78rem;
-}
-
-.trade-section {
-  margin: 14px 0 2px;
-}
-
-.trade-upgrade {
-  grid-column: 2 / 4;
-  justify-self: end;
-}
-
-.game-modal {
-  text-align: center;
-  z-index: 30;
-}
-
-.modal-title {
-  margin: 4px 0 0;
-  font-size: 1.4rem;
-  font-weight: 800;
-}
-
-.modal-line {
-  margin: 8px 0;
-  color: rgba(248, 237, 214, 0.85);
-}
-
-.modal-button {
-  margin-top: 14px;
-  padding: 10px 26px;
-  border: 1px solid rgba(124, 232, 216, 0.4);
-  border-radius: 10px;
-  background: rgba(124, 232, 216, 0.16);
-  color: #cdf6ee;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.toast {
-  position: fixed;
-  top: 84px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 9px 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(214, 58, 46, 0.5);
-  background: rgba(60, 14, 10, 0.85);
-  color: #ffd9d0;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  z-index: 25;
-}
-
-.toast.visible {
-  opacity: 1;
-}
-
+/* ---------- 任务日志：羊皮纸卷轴（整套 UI 里唯一的亮色面板） ---------- */
 .quest-panel {
   position: fixed;
-  left: 18px;
-  top: 46%;
+  left: 16px;
+  top: 44%;
   transform: translateY(-50%);
-  width: 230px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 233, 184, 0.22);
-  background: rgba(22, 16, 11, 0.72);
-  color: #f8edd6;
-  backdrop-filter: blur(12px);
+  width: 236px;
+  padding: 20px 16px 22px;
+  color: var(--parchment-ink);
+  background:
+    radial-gradient(ellipse 120% 40% at 50% -10%, rgba(120, 86, 40, 0.18), transparent),
+    radial-gradient(ellipse 90% 30% at 60% 110%, rgba(120, 86, 40, 0.14), transparent),
+    linear-gradient(174deg, var(--parchment) 0%, var(--parchment-deep) 100%);
+  /* 撕边卷轴形 */
+  clip-path: polygon(
+    0% 2.2%, 5% 0%, 12% 1.6%, 22% 0.4%, 33% 1.8%, 45% 0.2%, 57% 1.5%, 68% 0.5%,
+    79% 1.9%, 90% 0.3%, 96% 1.4%, 100% 3%, 99.6% 96%, 95% 100%, 86% 98.4%,
+    74% 99.8%, 62% 98.2%, 50% 99.6%, 38% 98.3%, 26% 99.7%, 15% 98.2%, 6% 99.5%, 0.4% 97%
+  );
+  box-shadow: 0 12px 26px rgba(15, 8, 2, 0.45);
   pointer-events: none;
   z-index: 10;
 }
 
 .quest-title {
-  margin: 0 0 8px;
-  color: #7ce8d8;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+  color: #6b4a1c;
+  border-bottom: 1px solid rgba(107, 74, 28, 0.35);
+  padding-bottom: 6px;
 }
 
 .quest-panel ul {
@@ -365,135 +297,81 @@ h1 {
   gap: 8px;
   align-items: flex-start;
   padding: 5px 0;
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .quest-mark {
-  flex: 0 0 auto;
+  flex: 0 0 16px;
+  height: 16px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.62rem;
   font-weight: 700;
 }
 
 .quest-done {
-  color: rgba(248, 237, 214, 0.45);
+  color: rgba(74, 52, 22, 0.5);
   text-decoration: line-through;
+  text-decoration-color: rgba(74, 52, 22, 0.4);
 }
 
 .quest-done .quest-mark {
-  color: #5df08d;
+  background: #7c9a5d;
+  color: var(--cream);
   text-decoration: none;
 }
 
-.quest-active .quest-mark {
-  color: #ffd678;
-}
-
-.quest-complete {
-  margin: 8px 0 0;
-  color: #ffd678;
+.quest-active {
   font-weight: 700;
-  font-size: 0.85rem;
 }
 
-@media (max-width: 900px) {
-  .quest-panel {
-    display: none;
+.quest-active .quest-mark {
+  background: var(--wax);
+  color: var(--cream);
+  box-shadow: 0 0 0 2px rgba(162, 55, 42, 0.25);
+  animation: seal-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes seal-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(162, 55, 42, 0.16);
   }
 }
 
-/* ===== UI 打磨：HUD 徽章化 / 聊天面板 / 操作提示 ===== */
-
-.brand-strip {
-  align-items: center;
-  gap: 18px;
-  padding: 12px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 233, 184, 0.18);
-  background: rgba(22, 16, 11, 0.72);
-  box-shadow: 0 10px 30px rgba(20, 10, 0, 0.35);
+.quest-complete {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  color: var(--wax);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
 }
 
-.brand-title h1 {
-  font-size: clamp(1rem, 2.2vw, 1.3rem);
-  letter-spacing: 0.02em;
-}
-
-.stat-grid {
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-}
-
-.stat-grid .stat-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 11px;
-  border: 1px solid rgba(255, 233, 184, 0.16);
-  background: rgba(255, 233, 184, 0.07);
-  white-space: nowrap;
-}
-
-.stat-chip i {
-  font-style: normal;
-  font-size: 0.85rem;
-}
-
-.stat-chip b {
-  font-size: 0.98rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-chip em {
-  font-style: normal;
-  font-size: 0.68rem;
-  color: rgba(248, 237, 214, 0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.stat-gold b {
-  color: #ffd678;
-}
-
-.stat-hull b {
-  color: #7df0a0;
-}
-
-.stat-hull.hull-low b {
-  color: #ff7a68;
-}
-
-.stat-hull.hull-low {
-  border-color: rgba(255, 122, 104, 0.5);
-  animation: hull-pulse 1.1s ease-in-out infinite;
-}
-
-@keyframes hull-pulse {
-  50% { background: rgba(255, 122, 104, 0.18); }
-}
-
+/* ---------- 聊天：墨字直接落在世界上 ---------- */
 .chat-panel {
   position: fixed;
-  left: 18px;
-  bottom: 18px;
-  width: min(340px, 40vw);
+  left: 16px;
+  bottom: 16px;
+  width: min(330px, 42vw);
   z-index: 12;
   pointer-events: none;
 }
 
 .chat-badge {
-  margin: 0 0 6px;
-  font-size: 0.68rem;
+  margin: 0 0 5px;
+  font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(248, 237, 214, 0.75);
+  letter-spacing: 0.2em;
+  color: rgba(246, 236, 210, 0.55);
   text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(15, 8, 2, 0.9);
 }
 
 .chat-local {
-  color: #ffd678;
+  color: var(--brass-bright);
 }
 
 #chat-log {
@@ -502,66 +380,315 @@ h1 {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .chat-line {
   font-size: 0.8rem;
-  line-height: 1.35;
-  color: #f3e7cd;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  line-height: 1.4;
+  color: var(--cream);
+  text-shadow:
+    0 1px 2px rgba(15, 8, 2, 0.95),
+    0 0 6px rgba(15, 8, 2, 0.6);
   overflow-wrap: anywhere;
 }
 
 .chat-line b {
-  margin-right: 2px;
+  margin-right: 3px;
+  font-weight: 700;
 }
 
 .chat-npc b {
-  color: #8fd8ff;
+  color: #a8cfe8;
 }
 
 .chat-player b {
-  color: #ffd678;
+  color: var(--brass-bright);
 }
 
-.chat-system {
-  color: #ffb3a6;
-}
-
+.chat-system,
 .chat-system b {
-  color: #ff8a76;
+  color: #f0a58f;
 }
 
 #chat-input {
-  margin-top: 8px;
+  margin-top: 7px;
   width: 100%;
   padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 214, 120, 0.45);
-  background: rgba(22, 16, 11, 0.92);
-  color: #f8edd6;
+  border-radius: 5px;
+  border: 1px solid var(--brass-dim);
+  background: var(--ink-soft);
+  color: var(--cream);
+  font-family: var(--body);
   font-size: 0.85rem;
   outline: none;
   pointer-events: auto;
+  box-shadow: inset 0 2px 6px rgba(15, 8, 2, 0.6);
 }
 
+#chat-input:focus {
+  border-color: var(--brass-bright);
+}
+
+/* ---------- 交易所：大木牌 ---------- */
+.trade-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 40px));
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding: 20px 22px 18px;
+  color: var(--cream);
+  z-index: 20;
+}
+
+.trade-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.trade-eyebrow {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  color: var(--brass-bright);
+  font-size: 1.3rem;
+  letter-spacing: 0.05em;
+}
+
+.trade-section {
+  font-size: 1.05rem;
+  margin: 16px 0 2px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(201, 151, 62, 0.3);
+}
+
+.trade-stats {
+  margin: 3px 0 0;
+  font-size: 0.85rem;
+  color: rgba(246, 236, 210, 0.75);
+}
+
+.trade-stats b {
+  color: var(--brass-bright);
+}
+
+.trade-close {
+  border: 1px solid var(--brass-dim);
+  border-radius: 5px;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--cream);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.trade-close:hover {
+  background: rgba(201, 151, 62, 0.18);
+}
+
+.trade-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid rgba(201, 151, 62, 0.14);
+}
+
+.trade-row:first-of-type {
+  border-top: none;
+}
+
+.trade-good b {
+  display: block;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.trade-good span {
+  color: rgba(246, 236, 210, 0.55);
+  font-size: 0.74rem;
+}
+
+.trade-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* 黄铜按钮：上亮下暗的立体铸感 */
+.trade-actions button,
+.modal-button {
+  border: 1px solid rgba(24, 14, 5, 0.85);
+  border-radius: 5px;
+  padding: 7px 11px;
+  background: linear-gradient(178deg, var(--brass-bright) 0%, var(--brass) 55%, #a4762c 100%);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 190, 0.75),
+    0 2px 0 rgba(24, 14, 5, 0.7);
+  text-shadow: 0 1px 0 rgba(255, 236, 190, 0.4);
+}
+
+.trade-actions button:hover:not(:disabled),
+.modal-button:hover {
+  filter: brightness(1.08);
+}
+
+.trade-actions button:active:not(:disabled),
+.modal-button:active {
+  translate: 0 1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 190, 0.75),
+    0 1px 0 rgba(24, 14, 5, 0.7);
+}
+
+.trade-actions button[data-action="sell"] {
+  background: linear-gradient(178deg, #e8d5ac 0%, #cdb37f 55%, #a98f58 100%);
+}
+
+.trade-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  filter: saturate(0.4);
+}
+
+.trade-upgrade {
+  grid-column: 2 / 4;
+  justify-self: end;
+}
+
+.trade-na {
+  color: rgba(246, 236, 210, 0.3);
+  padding: 0 18px;
+  font-size: 0.78rem;
+}
+
+.trade-hint {
+  margin: 14px 0 0;
+  text-align: center;
+  color: rgba(246, 236, 210, 0.45);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- 结算弹窗 ---------- */
+.game-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(430px, calc(100vw - 40px));
+  padding: 24px 26px;
+  text-align: center;
+  color: var(--cream);
+  z-index: 30;
+}
+
+.modal-title {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.9rem;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(24, 14, 5, 0.8);
+}
+
+.game-modal .trade-eyebrow {
+  font-family: var(--body);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.modal-line {
+  margin: 9px 0;
+  color: rgba(246, 236, 210, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.modal-button {
+  margin-top: 14px;
+  padding: 10px 30px;
+  font-size: 0.85rem;
+}
+
+/* ---------- 受击横幅：红蜡封条 ---------- */
+.toast {
+  position: fixed;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  padding: 8px 20px;
+  border-radius: 3px;
+  background: linear-gradient(178deg, #b8452e, #8f2f1e);
+  border: 1px solid rgba(24, 14, 5, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 170, 0.35),
+    0 4px 0 rgba(24, 14, 5, 0.5),
+    0 10px 22px rgba(15, 8, 2, 0.45);
+  color: #ffe4d6;
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.toast.visible {
+  opacity: 1;
+}
+
+/* ---------- 操作速查 ---------- */
 .controls-hint {
   position: fixed;
-  right: 18px;
-  bottom: 16px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  background: rgba(22, 16, 11, 0.55);
-  color: rgba(248, 237, 214, 0.6);
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
+  right: 16px;
+  bottom: 14px;
+  color: rgba(246, 236, 210, 0.5);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 3px rgba(15, 8, 2, 0.9);
   pointer-events: none;
   z-index: 10;
 }
 
+/* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
+  .quest-panel,
   .controls-hint {
     display: none;
+  }
+
+  .stat-chip {
+    padding: 4px 10px;
+  }
+
+  .stat-chip em {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .brand-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
   }
 }

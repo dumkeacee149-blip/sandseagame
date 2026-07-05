@@ -23,7 +23,29 @@ def import_base():
     mesh = next(obj for obj in bpy.context.scene.objects if obj.type == "MESH")
     armature.name = "H01_Armature"
     mesh.name = "H01_Hero_Skinned"
+    fix_weapon_skinning(mesh)
     return armature, mesh
+
+
+def fix_weapon_skinning(mesh):
+    right_hand = mesh.vertex_groups.get("RightHand")
+    if not right_hand:
+        return
+
+    # The Hunyuan auto-skin spreads the saw blade across neighboring bones.
+    # Keep the blade rigid on the hand to avoid smeared sword silhouettes in motion.
+    blade_indices = []
+    for vertex in mesh.data.vertices:
+        world = mesh.matrix_world @ vertex.co
+        if world.x < -0.18 and world.y < -0.24 and 0.22 < world.z < 1.32:
+            blade_indices.append(vertex.index)
+
+    for group in mesh.vertex_groups:
+        try:
+            group.remove(blade_indices)
+        except RuntimeError:
+            pass
+    right_hand.add(blade_indices, 1.0, "REPLACE")
 
 
 def reset_pose(armature):
@@ -211,9 +233,13 @@ def export_glb(armature, mesh):
     armature.select_set(True)
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = armature
+    for obj in list(bpy.context.scene.objects):
+      if obj not in {armature, mesh}:
+          bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.export_scene.gltf(
         filepath=OUT_GLB,
         export_format="GLB",
+        use_selection=True,
         export_skins=True,
         export_animations=True,
         export_animation_mode="ACTIONS",
