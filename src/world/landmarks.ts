@@ -2,13 +2,13 @@ import * as THREE from "three";
 import { palette } from "../core/palette";
 import { mat, box } from "../core/materials";
 import { hunyuanSlot } from "../core/models";
-import { sandHeight } from "./sand";
+import { sandHeight, worldHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
 
 // 只按顶层子节点贴地，避免拆散体素资产的内部结构
 function groundChildren(group: THREE.Group) {
   group.children.forEach((child) => {
-    child.position.y += sandHeight(
+    child.position.y += worldHeight(
       group.position.x + child.position.x,
       group.position.z + child.position.z,
     );
@@ -128,10 +128,48 @@ export function createSaltFlats() {
     const shard = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
     const x = 180 + THREE.MathUtils.randFloatSpread(350);
     const z = 680 + THREE.MathUtils.randFloatSpread(240);
-    shard.position.set(x, sandHeight(x, z) + 1, z);
+    shard.position.set(x, worldHeight(x, z) + 1, z);
     shard.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
     group.add(shard);
   }
+  return group;
+}
+
+// Saltcrest 盐滩镇（第二港口的先行营地，正式交易点随经济系统上线）
+export function createSaltcrestCamp() {
+  const group = new THREE.Group();
+  group.position.set(340, 0, 700);
+
+  const tentPlaceholder = createVoxelAsset("A03");
+  tentPlaceholder.scale.setScalar(10);
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
+  tent.position.set(-40, 0, -30);
+  tent.rotation.y = -Math.PI / 6;
+  group.add(tent);
+
+  const heroPlaceholder = createVoxelAsset("A02");
+  heroPlaceholder.scale.setScalar(4.5);
+  const keeper = hunyuanSlot(heroPlaceholder, "/models/hero.glb");
+  keeper.position.set(-8, 0, 12);
+  keeper.rotation.y = Math.PI * 0.3;
+  group.add(keeper);
+
+  for (let i = 0; i < 4; i += 1) {
+    const angle = 0.8 + (i / 4) * Math.PI * 1.4;
+    group.add(
+      createPalm(
+        new THREE.Vector3(Math.cos(angle) * 92, 0, Math.sin(angle) * 92),
+        0.75 + (i % 2) * 0.3,
+      ),
+    );
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    group.add(box(13, 11, 13, mat("crate", "#8a5a35"), [42 + (i % 3) * 20, 16, 48 + Math.floor(i / 3) * 22]));
+  }
+
+  groundChildren(group);
+
   return group;
 }
 

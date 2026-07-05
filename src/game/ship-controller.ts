@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { isDown } from "../core/input";
-import { sandHeight } from "../world/sand";
+import { sandHeight, islandLift } from "../world/sand";
 
 export type ShipState = {
   position: THREE.Vector3;
@@ -32,7 +32,15 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   shipState.heading += turn * delta;
 
   const forward = tempVec.set(Math.sin(shipState.heading), 0, Math.cos(shipState.heading));
-  shipState.position.addScaledVector(forward, shipState.speed * delta);
+  const nextX = shipState.position.x + forward.x * shipState.speed * delta;
+  const nextZ = shipState.position.z + forward.z * shipState.speed * delta;
+  // 岛屿即礁岸：沙艇撞上抬升地形则停船（后续接耐久扣血）
+  if (islandLift(nextX, nextZ) > 6) {
+    shipState.speed *= 0.2;
+  } else {
+    shipState.position.x = nextX;
+    shipState.position.z = nextZ;
+  }
   shipState.position.x = THREE.MathUtils.clamp(shipState.position.x, -1420, 1420);
   shipState.position.z = THREE.MathUtils.clamp(shipState.position.z, -1420, 1420);
   shipState.position.y =

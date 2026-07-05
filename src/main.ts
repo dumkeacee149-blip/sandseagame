@@ -15,6 +15,7 @@ import {
   createOasisPort,
   createRuins,
   createSaltFlats,
+  createSaltcrestCamp,
   createDistantCaravans,
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
@@ -82,6 +83,7 @@ scene.add(ship);
 scene.add(createOasisPort());
 scene.add(createRuins());
 scene.add(createSaltFlats());
+scene.add(createSaltcrestCamp());
 const worm = createWorm();
 scene.add(worm);
 scene.add(createDistantCaravans());
