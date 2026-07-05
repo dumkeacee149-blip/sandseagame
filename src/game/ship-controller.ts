@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { isDown } from "../core/input";
 import { sandHeight, islandLift } from "../world/sand";
+import { SEA_OBSTACLES } from "../world/landmarks";
 
 export type ShipState = {
   position: THREE.Vector3;
@@ -18,6 +19,15 @@ export const shipState: ShipState = {
 
 const tempVec = new THREE.Vector3();
 
+function hitsSeaRock(x: number, z: number) {
+  for (const rock of SEA_OBSTACLES) {
+    const dx = x - rock.x;
+    const dz = z - rock.z;
+    if (dx * dx + dz * dz < rock.r * rock.r) return true;
+  }
+  return false;
+}
+
 export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number) {
   const forwardInput = Number(isDown("KeyW") || isDown("ArrowUp"));
   const backInput = Number(isDown("KeyS") || isDown("ArrowDown"));
@@ -34,8 +44,8 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   const forward = tempVec.set(Math.sin(shipState.heading), 0, Math.cos(shipState.heading));
   const nextX = shipState.position.x + forward.x * shipState.speed * delta;
   const nextZ = shipState.position.z + forward.z * shipState.speed * delta;
-  // 岛屿即礁岸：沙艇撞上抬升地形则停船（后续接耐久扣血）
-  if (islandLift(nextX, nextZ) > 6) {
+  // 岛屿与礁岩都是实体：撞上则停船（后续接耐久扣血）
+  if (islandLift(nextX, nextZ) > 6 || hitsSeaRock(nextX, nextZ)) {
     shipState.speed *= 0.2;
   } else {
     shipState.position.x = nextX;

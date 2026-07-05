@@ -8,6 +8,48 @@ import { createVoxelAsset } from "../voxel-assets";
 // 可劈碎的货箱：攻击系统的打击目标，劈碎掉战利品
 export const breakableCrates: THREE.Mesh[] = [];
 
+// 沙海礁岩：船的碰撞障碍（x/z/半径），visual 由 createSeaScatter 生成
+export const SEA_OBSTACLES: ReadonlyArray<{ x: number; z: number; r: number; model: string; fp: number; rot: number }> = [
+  { x: -150, z: 300, r: 30, model: "rock_a", fp: 55, rot: 0.4 },
+  { x: 200, z: -250, r: 33, model: "rock_b", fp: 60, rot: 1.7 },
+  { x: -900, z: 200, r: 26, model: "rock_c", fp: 48, rot: 2.8 },
+  { x: -250, z: 900, r: 28, model: "rock_a", fp: 50, rot: 3.9 },
+  { x: 800, z: 800, r: 34, model: "rock_b", fp: 62, rot: 0.9 },
+  { x: 1100, z: 100, r: 29, model: "rock_c", fp: 52, rot: 5.1 },
+  { x: -1100, z: -700, r: 32, model: "rock_a", fp: 58, rot: 2.2 },
+  { x: 100, z: -900, r: 30, model: "rock_b", fp: 55, rot: 4.4 },
+  { x: -700, z: -900, r: 25, model: "rock_c", fp: 45, rot: 1.1 },
+  { x: 500, z: -300, r: 22, model: "rock_a", fp: 40, rot: 3.3 },
+];
+
+// 环境素材占位：素色方块盒，混元模型加载后按脚印换入
+function envSlot(url: string, footprint: number, height = footprint) {
+  const placeholder = box(
+    footprint,
+    height,
+    footprint,
+    mat("env-placeholder", "#c9a25e"),
+    [0, height / 2, 0],
+  );
+  return hunyuanSlot(placeholder, url);
+}
+
+function placeEnv(
+  group: THREE.Group,
+  url: string,
+  footprint: number,
+  x: number,
+  z: number,
+  rotY = 0,
+  height = footprint,
+) {
+  const slot = envSlot(url, footprint, height);
+  slot.position.set(x, 0, z);
+  slot.rotation.y = rotY;
+  group.add(slot);
+  return slot;
+}
+
 // 只按顶层子节点贴地，避免拆散体素资产的内部结构
 function groundChildren(group: THREE.Group) {
   group.children.forEach((child) => {
@@ -81,6 +123,16 @@ export function createOasisPort() {
     group.add(crate);
   }
 
+  // E 系列环境素材：民居/水井/货摊/瞭望塔/栈桥，把港口做出小镇密度
+  placeEnv(group, "/models/house_a.glb", 60, -38, -150, 0.4);
+  placeEnv(group, "/models/house_b.glb", 55, 72, -128, -0.6);
+  placeEnv(group, "/models/house_c.glb", 55, -205, 30, 1.2);
+  placeEnv(group, "/models/well.glb", 26, 95, -30, 0);
+  placeEnv(group, "/models/stall_a.glb", 34, -92, 8, 0.9);
+  placeEnv(group, "/models/stall_b.glb", 34, -155, 52, 0.3);
+  placeEnv(group, "/models/tower.glb", 34, 150, -150, 0, 90);
+  placeEnv(group, "/models/jetty.glb", 52, 30, 215, 0, 14);
+
   groundChildren(group);
 
   return group;
@@ -130,13 +182,62 @@ export function createSaltFlats() {
   const group = new THREE.Group();
   const saltMat = mat("salt-flat", palette.salt);
   for (let i = 0; i < 9; i += 1) {
-    const shard = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
     const x = 180 + THREE.MathUtils.randFloatSpread(350);
     const z = 680 + THREE.MathUtils.randFloatSpread(240);
-    shard.position.set(x, worldHeight(x, z) + 1, z);
-    shard.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
-    group.add(shard);
+    if (i % 3 === 0) {
+      // 每三块换一簇混元盐晶，占位仍是原方块盐板
+      const placeholder = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
+      placeholder.position.y = 4;
+      const cluster = hunyuanSlot(placeholder, i % 2 === 0 ? "/models/salt_a.glb" : "/models/salt_b.glb");
+      cluster.position.set(x, worldHeight(x, z), z);
+      cluster.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
+      group.add(cluster);
+    } else {
+      const shard = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
+      shard.position.set(x, worldHeight(x, z) + 1, z);
+      shard.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
+      group.add(shard);
+    }
   }
+  return group;
+}
+
+// 沙海散布：礁岩(带船碰撞)/枯木/巨兽遗骨
+export function createSeaScatter() {
+  const group = new THREE.Group();
+
+  for (const rock of SEA_OBSTACLES) {
+    const slot = envSlot(`/models/${rock.model}.glb`, rock.fp, rock.fp * 0.8);
+    slot.position.set(rock.x, worldHeight(rock.x, rock.z) - 2, rock.z);
+    slot.rotation.y = rock.rot;
+    group.add(slot);
+  }
+
+  const deadwoodSpots: Array<[number, number, number]> = [
+    [-300, -700, 0.8],
+    [900, 400, 2.3],
+    [-800, 600, 4.1],
+    [300, 300, 5.6],
+  ];
+  deadwoodSpots.forEach(([x, z, rot]) => {
+    const slot = envSlot("/models/deadwood.glb", 30, 40);
+    slot.position.set(x, worldHeight(x, z) - 1, z);
+    slot.rotation.y = rot;
+    group.add(slot);
+  });
+
+  // 巨兽遗骨落在沙虫领地边缘：无声的警告牌
+  const ribSpots: Array<[number, number, number, number]> = [
+    [560, -540, 0.7, 80],
+    [930, -830, 2.4, 70],
+  ];
+  ribSpots.forEach(([x, z, rot, fp]) => {
+    const slot = envSlot("/models/ribs.glb", fp, fp * 0.5);
+    slot.position.set(x, worldHeight(x, z) - 1.5, z);
+    slot.rotation.y = rot;
+    group.add(slot);
+  });
+
   return group;
 }
 
@@ -174,6 +275,11 @@ export function createSaltcrestCamp() {
     breakableCrates.push(crate);
     group.add(crate);
   }
+
+  placeEnv(group, "/models/house_b.glb", 52, 75, -62, 2.2);
+  placeEnv(group, "/models/stall_a.glb", 32, 36, -18, -0.5);
+  placeEnv(group, "/models/tower.glb", 30, -92, 58, 0.6, 82);
+  placeEnv(group, "/models/jetty.glb", 50, 0, 172, 0, 14);
 
   groundChildren(group);
 
