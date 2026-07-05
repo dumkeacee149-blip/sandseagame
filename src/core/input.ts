@@ -21,7 +21,23 @@ export function consumePressed(code: string) {
   return has;
 }
 
-// 每帧结尾清空未消费的按键，防止旧按键在之后的状态里误触发
+let clickPending = false;
+
+export function initMouse() {
+  window.addEventListener("mousedown", (event) => {
+    if (event.button === 0) clickPending = true;
+  });
+}
+
+// 左键单击（边沿触发），语义同 consumePressed
+export function consumeClick() {
+  const clicked = clickPending;
+  clickPending = false;
+  return clicked;
+}
+
+// 每帧结尾清空未消费的按键/点击，防止旧输入在之后的状态里误触发
 export function clearFramePresses() {
   pressed.clear();
+  clickPending = false;
 }

@@ -6,9 +6,9 @@ const cargoEl = document.querySelector("#cargo");
 const windEl = document.querySelector("#wind");
 const routeEl = document.querySelector("#route");
 
-export function updateHud(shipSpeed: number, elapsed: number, shipPosition: THREE.Vector3) {
+export function updateHud(shipSpeed: number, elapsed: number, shipPosition: THREE.Vector3, salvage: number) {
   if (speedEl) speedEl.textContent = Math.round(Math.abs(shipSpeed) * 0.44).toString();
-  if (cargoEl) cargoEl.textContent = `${12 + Math.round(Math.sin(elapsed * 0.3) * 2)}`;
+  if (cargoEl) cargoEl.textContent = salvage.toString();
   if (windEl) windEl.textContent = elapsed % 18 > 9 ? "SE" : "NE";
 
   if (routeEl) {

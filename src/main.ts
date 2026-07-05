@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import "./styles.css";
 import { palette } from "./core/palette";
-import { initInput, consumePressed, clearFramePresses } from "./core/input";
+import { initInput, initMouse, consumePressed, consumeClick, clearFramePresses } from "./core/input";
 import { hunyuanSlot } from "./core/models";
+import { mat } from "./core/materials";
 import { createTerrain } from "./world/sand";
 import {
   createSkyDome,
@@ -17,10 +18,17 @@ import {
   createSaltFlats,
   createSaltcrestCamp,
   createDistantCaravans,
+  breakableCrates,
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
 import { shipState, updateShip, updateCamera } from "./game/ship-controller";
-import { playerState, createPlayerAvatar, updatePlayer, updateWalkCamera } from "./game/player";
+import {
+  playerState,
+  createPlayerAvatar,
+  updatePlayer,
+  updateWalkCamera,
+  startAttack,
+} from "./game/player";
 import { updateHud } from "./ui/hud";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -128,6 +136,65 @@ function boardShip() {
   player.visible = false;
 }
 
+// 劈碎货箱：碎木屑飞溅 + 战利品计数（真实数据取代 HUD 假数字的第一步）
+let salvage = 0;
+
+type Splinter = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number };
+const splinters: Splinter[] = [];
+const splinterGeometry = new THREE.BoxGeometry(3.4, 3.4, 3.4);
+
+function spawnSplinters(origin: THREE.Vector3) {
+  for (let i = 0; i < 6; i += 1) {
+    const mesh = new THREE.Mesh(splinterGeometry, mat("crate", "#8a5a35"));
+    mesh.position.copy(origin);
+    scene.add(mesh);
+    splinters.push({
+      mesh,
+      velocity: new THREE.Vector3(
+        THREE.MathUtils.randFloatSpread(50),
+        THREE.MathUtils.randFloat(40, 90),
+        THREE.MathUtils.randFloatSpread(50),
+      ),
+      life: 0.9,
+    });
+  }
+}
+
+function updateSplinters(delta: number) {
+  for (let i = splinters.length - 1; i >= 0; i -= 1) {
+    const splinter = splinters[i];
+    splinter.life -= delta;
+    splinter.velocity.y -= 220 * delta;
+    splinter.mesh.position.addScaledVector(splinter.velocity, delta);
+    splinter.mesh.rotation.x += delta * 6;
+    splinter.mesh.rotation.z += delta * 5;
+    splinter.mesh.scale.setScalar(Math.max(splinter.life / 0.9, 0.01));
+    if (splinter.life <= 0) {
+      scene.remove(splinter.mesh);
+      splinters.splice(i, 1);
+    }
+  }
+}
+
+const hitProbe = new THREE.Vector3();
+const crateWorldPos = new THREE.Vector3();
+
+function tryBreakCrates() {
+  hitProbe
+    .set(Math.sin(playerState.heading), 0, Math.cos(playerState.heading))
+    .multiplyScalar(18)
+    .add(player.position);
+  for (const crate of breakableCrates) {
+    if (!crate.visible) continue;
+    crate.getWorldPosition(crateWorldPos);
+    if (crateWorldPos.distanceTo(hitProbe) < 24) {
+      crate.visible = false;
+      spawnSplinters(crateWorldPos);
+      salvage += 1;
+    }
+  }
+}
+
 function onResize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -138,6 +205,7 @@ function onResize() {
 
 window.addEventListener("resize", onResize);
 initInput();
+initMouse();
 
 // 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
 if (import.meta.env.DEV) {
@@ -154,6 +222,8 @@ if (import.meta.env.DEV) {
       playerState.speed = 0;
     },
     getMode: () => mode,
+    getPlayerY: () => playerState.position.y,
+    getSalvage: () => salvage,
     goAshore,
     boardShip,
   };
@@ -172,17 +242,19 @@ function animate() {
   } else {
     updatePlayer(player, delta, elapsed);
     updateWalkCamera(camera, player, delta);
+    if (consumeClick() && startAttack()) tryBreakCrates();
     const nearShip = player.position.distanceTo(ship.position) < 60;
     setAction(nearShip ? "Press E to board the skiff" : null);
     if (nearShip && consumePressed("KeyE")) boardShip();
   }
   clearFramePresses();
 
+  updateSplinters(delta);
   updateWorm(worm, elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
-  updateHud(shipState.speed, elapsed, ship.position);
+  updateHud(shipState.speed, elapsed, ship.position, salvage);
   renderer.render(scene, camera);
 }
 

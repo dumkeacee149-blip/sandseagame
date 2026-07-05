@@ -5,6 +5,9 @@ import { hunyuanSlot } from "../core/models";
 import { sandHeight, worldHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
 
+// 可劈碎的货箱：攻击系统的打击目标，劈碎掉战利品
+export const breakableCrates: THREE.Mesh[] = [];
+
 // 只按顶层子节点贴地，避免拆散体素资产的内部结构
 function groundChildren(group: THREE.Group) {
   group.children.forEach((child) => {
@@ -73,7 +76,9 @@ export function createOasisPort() {
   }
 
   for (let i = 0; i < 8; i += 1) {
-    group.add(box(14, 12, 14, mat("crate", "#8a5a35"), [-82 + i * 22, 17, 92 + (i % 2) * 20]));
+    const crate = box(14, 12, 14, mat("crate", "#8a5a35"), [-82 + i * 22, 17, 92 + (i % 2) * 20]);
+    breakableCrates.push(crate);
+    group.add(crate);
   }
 
   groundChildren(group);
@@ -165,7 +170,9 @@ export function createSaltcrestCamp() {
   }
 
   for (let i = 0; i < 5; i += 1) {
-    group.add(box(13, 11, 13, mat("crate", "#8a5a35"), [42 + (i % 3) * 20, 16, 48 + Math.floor(i / 3) * 22]));
+    const crate = box(13, 11, 13, mat("crate", "#8a5a35"), [42 + (i % 3) * 20, 16, 48 + Math.floor(i / 3) * 22]);
+    breakableCrates.push(crate);
+    group.add(crate);
   }
 
   groundChildren(group);
