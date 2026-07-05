@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import "./styles.css";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -350,9 +352,34 @@ function createSandLines() {
 
 scene.add(createSandLines());
 
-const ship = createVoxelAsset("A01");
-ship.scale.setScalar(9);
+// 船体：优先加载混元压缩模型，失败则保留代码拼装的体素占位
+const ship = new THREE.Group();
+const shipPlaceholder = createVoxelAsset("A01");
+shipPlaceholder.scale.setScalar(9);
+ship.add(shipPlaceholder);
 scene.add(ship);
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+gltfLoader.load(
+  "/models/skiff.glb",
+  (gltf) => {
+    const model = gltf.scene;
+    const bounds = new THREE.Box3().setFromObject(model);
+    const size = bounds.getSize(new THREE.Vector3());
+    model.scale.setScalar(75 / Math.max(size.x, size.z));
+    model.rotation.y = Math.PI / 2;
+    bounds.setFromObject(model);
+    const center = bounds.getCenter(new THREE.Vector3());
+    model.position.set(-center.x, -bounds.min.y, -center.z);
+    ship.remove(shipPlaceholder);
+    ship.add(model);
+  },
+  undefined,
+  (error) => {
+    console.error("混元船体模型加载失败，继续使用体素占位", error);
+  },
+);
 
 function createPalm(position: THREE.Vector3, scale = 1) {
   const palm = createVoxelAsset("A04");
