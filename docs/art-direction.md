@@ -53,4 +53,4 @@ Sandsea Privateers is a pixelated, blocky low-poly sand fantasy game. The world 
 
 ## First Review Batch
 
-Start with the mixed review board at `/asset-viewer.html?sheet=1`. A01 now uses Hunyuan v2 because it passes the pixel/block first check; A02 uses Hunyuan v1 because it cleanly reads as a Minecraft-like sand privateer hero. Local backups remain available with `&source=local`. A01 v1 from Hunyuan is only a silhouette reference because it is too smooth.
+Start with the mixed review board at `/asset-viewer.html?sheet=1`. A01-A10 now have Hunyuan candidates loaded through the local Three.js asset viewer, with local voxel backups available by adding `&source=local` to an individual asset URL. A01 v1 from Hunyuan remains only a silhouette reference because it is too smooth; A01 v2 is the preferred skiff candidate.

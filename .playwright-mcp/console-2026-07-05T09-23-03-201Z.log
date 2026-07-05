@@ -34,3 +34,9 @@
 [  422094ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
 [  422094ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
 [  445703ms] [WARNING] [ENTITY_JUMP] id=36983 jump=16.1 from=(365,-350) to=(349,-351) tick=398116 snaps=10 @ https://arrr.fun/game.min.js?v=1783223805690:515
+[  482099ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  482099ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  542086ms] [ERROR] Access to fetch at 'https://www.modd.io/api/player/presence' from origin 'https://arrr.fun' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://arrr.fun/:0
+[  542086ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.modd.io/api/player/presence:0
+[  577237ms] [LOG] [Attack] sent yaw=1.80 pitch=-0.17 @ https://arrr.fun/game.min.js?v=1783223805690:998
+[  578137ms] [LOG] [Attack] sent yaw=1.80 pitch=-0.17 @ https://arrr.fun/game.min.js?v=1783223805690:998

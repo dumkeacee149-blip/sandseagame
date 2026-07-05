@@ -17,4 +17,4 @@ Before game implementation, approve these core 3D assets as the visual baseline.
 
 ## Approval Rule
 
-Approve A01-A07 before gameplay production starts. A08-A10 can be refined during the first playable pass. A01 v2 and A02 v1 from Hunyuan are the current preferred candidates and are visible in `/asset-viewer.html?asset=A01` and `/asset-viewer.html?asset=A02`; local backups stay available with `&source=local`. A Hunyuan model only passes if it looks built from cuboids rather than smoothed clay or toy plastic.
+Approve A01-A10 before gameplay production starts. The current Hunyuan candidate set is visible one-by-one in `/asset-viewer.html?asset=A01` through `/asset-viewer.html?asset=A10`; local backups stay available with `&source=local`. A Hunyuan model only passes if it looks built from cuboids rather than smoothed clay or toy plastic.

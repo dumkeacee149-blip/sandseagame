@@ -9,11 +9,11 @@ if (!canvas) {
 }
 
 const palette = {
-  skyTop: new THREE.Color("#202746"),
-  skyHorizon: new THREE.Color("#e6ad69"),
-  sandLow: new THREE.Color("#c98a4a"),
-  sandMid: new THREE.Color("#e3b56a"),
-  sandHigh: new THREE.Color("#f2d79a"),
+  skyTop: new THREE.Color("#3f8ee0"),
+  skyHorizon: new THREE.Color("#e9ddbc"),
+  sandLow: new THREE.Color("#b06f35"),
+  sandMid: new THREE.Color("#d99c52"),
+  sandHigh: new THREE.Color("#eec87e"),
   salt: new THREE.Color("#e9e2c9"),
   basalt: new THREE.Color("#1c1b22"),
   wood: new THREE.Color("#6e4026"),
@@ -40,7 +40,7 @@ renderer.toneMappingExposure = 1.02;
 
 const scene = new THREE.Scene();
 scene.background = palette.skyTop;
-scene.fog = new THREE.Fog("#d8a15f", 620, 2350);
+scene.fog = new THREE.Fog("#e5d5ae", 950, 2700);
 
 const camera = new THREE.PerspectiveCamera(
   58,
@@ -53,10 +53,10 @@ camera.position.set(0, 120, 220);
 const clock = new THREE.Clock();
 const tempVec = new THREE.Vector3();
 
-const hemi = new THREE.HemisphereLight("#fff1cf", "#4c2f31", 2.35);
+const hemi = new THREE.HemisphereLight("#eaf4ff", "#8a6440", 2.1);
 scene.add(hemi);
 
-const sunLight = new THREE.DirectionalLight("#ffe0a7", 4.8);
+const sunLight = new THREE.DirectionalLight("#ffedc4", 4.6);
 sunLight.position.set(-680, 850, -320);
 scene.add(sunLight);
 
@@ -185,7 +185,7 @@ function createTerrain() {
 
       cellColor(ix, iz, h, topColor);
       pushQuad([x0, h, z0], [x0, h, z1], [x1, h, z1], [x1, h, z0], topColor);
-      wallColor.copy(topColor).multiplyScalar(0.68);
+      wallColor.copy(topColor).multiplyScalar(0.6);
 
       if (ix + 1 < cells) {
         const hn = quantizedHeight(ix + 1, iz);
@@ -547,14 +547,14 @@ function updateShip(delta: number, elapsed: number) {
 
 function updateCamera(delta: number) {
   const back = new THREE.Vector3(
-    -Math.sin(shipState.heading) * 170,
-    92,
-    -Math.cos(shipState.heading) * 170,
+    -Math.sin(shipState.heading) * 165,
+    58,
+    -Math.cos(shipState.heading) * 165,
   );
-  const side = new THREE.Vector3(Math.cos(shipState.heading), 0, -Math.sin(shipState.heading)).multiplyScalar(32);
+  const side = new THREE.Vector3(Math.cos(shipState.heading), 0, -Math.sin(shipState.heading)).multiplyScalar(28);
   const desired = ship.position.clone().add(back).add(side);
   camera.position.lerp(desired, 1 - Math.exp(-delta * 3.8));
-  camera.lookAt(ship.position.x, ship.position.y + 34, ship.position.z);
+  camera.lookAt(ship.position.x, ship.position.y + 46, ship.position.z);
 }
 
 function updateWorm(elapsed: number) {
