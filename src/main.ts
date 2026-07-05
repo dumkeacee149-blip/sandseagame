@@ -190,17 +190,8 @@ function createTerrain() {
   return { terrain, geometry };
 }
 
-const { terrain, geometry: terrainGeometry } = createTerrain();
+const { terrain } = createTerrain();
 scene.add(terrain);
-
-function updateTerrain(time: number) {
-  const positions = terrainGeometry.attributes.position;
-  for (let i = 0; i < positions.count; i += 1) {
-    positions.setY(i, sandHeight(positions.getX(i), positions.getZ(i), time));
-  }
-  positions.needsUpdate = true;
-  terrainGeometry.computeVertexNormals();
-}
 
 function createSkyDome() {
   const geometry = new THREE.SphereGeometry(2600, 32, 16);
@@ -622,7 +613,7 @@ function updateShip(delta: number, elapsed: number) {
   shipState.position.x = THREE.MathUtils.clamp(shipState.position.x, -1420, 1420);
   shipState.position.z = THREE.MathUtils.clamp(shipState.position.z, -1420, 1420);
   shipState.position.y =
-    sandHeight(shipState.position.x, shipState.position.z, elapsed) + 18 + Math.sin(elapsed * 4) * 0.9;
+    sandHeight(shipState.position.x, shipState.position.z) + 18 + Math.sin(elapsed * 4) * 0.9;
 
   ship.position.copy(shipState.position);
   ship.rotation.y = shipState.heading;
@@ -686,12 +677,9 @@ window.addEventListener("resize", onResize);
 window.addEventListener("keydown", (event) => keys.add(event.code));
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 
-let frame = 0;
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
-  frame += 1;
-  if (frame % 2 === 0) updateTerrain(elapsed);
   updateShip(delta, elapsed);
   updateCamera(delta);
   updateWorm(elapsed);
