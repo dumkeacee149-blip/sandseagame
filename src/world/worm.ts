@@ -30,7 +30,7 @@ export function createWorm() {
   placeholder.scale.setScalar(16);
   rig.add(placeholder);
 
-  loadRiggedModel("/models/leviathan_rigged.glb")
+  loadRiggedModel("/models/leviathan_rigged.glb?v=blender-h02-v2")
     .then(({ scene: model, animations }) => {
       fitRiggedToPlaceholder(model, placeholder);
       rig.remove(placeholder);

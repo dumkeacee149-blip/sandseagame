@@ -21,11 +21,13 @@ export const shipState: ShipState = {
 
 const tempVec = new THREE.Vector3();
 
-function hitsSeaRock(x: number, z: number) {
+// 只拦"深入"，放行"逃离"：即使船被卡进礁岩圈内，也永远可以退出来
+function seaRockBlocks(curX: number, curZ: number, nextX: number, nextZ: number) {
   for (const rock of SEA_OBSTACLES) {
-    const dx = x - rock.x;
-    const dz = z - rock.z;
-    if (dx * dx + dz * dz < rock.r * rock.r) return true;
+    const nextDist = Math.hypot(nextX - rock.x, nextZ - rock.z);
+    if (nextDist >= rock.r) continue;
+    const curDist = Math.hypot(curX - rock.x, curZ - rock.z);
+    if (nextDist <= curDist) return true;
   }
   return false;
 }
@@ -47,8 +49,11 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   const forward = tempVec.set(Math.sin(shipState.heading), 0, Math.cos(shipState.heading));
   const nextX = shipState.position.x + forward.x * shipState.speed * delta;
   const nextZ = shipState.position.z + forward.z * shipState.speed * delta;
-  // 岛屿与礁岩都是实体：撞上则停船（后续接耐久扣血）
-  if (islandLift(nextX, nextZ) > 6 || hitsSeaRock(nextX, nextZ)) {
+  // 岛屿与礁岩都是实体：只拦"更深入"的移动，向外逃离永远放行（防卡死）
+  const liftHere = islandLift(shipState.position.x, shipState.position.z);
+  const liftNext = islandLift(nextX, nextZ);
+  const islandBlocks = liftNext > 6 && liftNext >= liftHere;
+  if (islandBlocks || seaRockBlocks(shipState.position.x, shipState.position.z, nextX, nextZ)) {
     shipState.speed *= 0.2;
   } else {
     shipState.position.x = nextX;

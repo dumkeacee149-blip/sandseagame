@@ -35,8 +35,8 @@ const hunyuanAssetPaths = {
   A08: "/assets/hunyuan/raw/A08_hunyuan_relic_chest_v1.glb",
   A09: "/assets/hunyuan/raw/A09_hunyuan_harpoon_cannon_v1.glb",
   A10: "/assets/hunyuan/raw/A10_hunyuan_caravan_cart_v1.glb",
-  H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb",
-  H02: "/assets/hunyuan/raw/H02_sand_leviathan_rigged_v1.glb",
+  H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb?v=blender-h01-v2",
+  H02: "/assets/hunyuan/raw/H02_sand_leviathan_rigged_v1.glb?v=blender-h02-v2",
 } as const;
 let selectedIndex = Math.max(
   0,
@@ -361,6 +361,16 @@ function updateHeader(index: number) {
   }
 
   if (getPreferredHunyuanPath(index)) {
+    if (asset.id === "H01") {
+      title.textContent = "H01 Blender重做";
+      role.textContent = `${asset.name} / Blender rigged GLB`;
+      return;
+    }
+    if (asset.id === "H02") {
+      title.textContent = "H02 Blender重做";
+      role.textContent = `${asset.name} / Blender rigged GLB`;
+      return;
+    }
     title.textContent = `${asset.id} 混元候选`;
     role.textContent = `${asset.name} / Hunyuan GLB if available`;
     return;

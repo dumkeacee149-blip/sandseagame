@@ -364,7 +364,7 @@ function animate() {
     updateWalkCamera(camera, player, delta, cameraOrbit);
     if (consumePressed("KeyE") || consumePressed("Escape")) closeTradePanel();
   } else {
-    updatePlayer(player, delta, elapsed);
+    updatePlayer(player, delta, elapsed, ship.position);
     updateCameraOrbit();
     updateWalkCamera(camera, player, delta, cameraOrbit);
     if (consumeClick() && startAttack()) tryBreakCrates();

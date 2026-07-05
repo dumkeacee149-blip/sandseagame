@@ -69,13 +69,25 @@ function isIslandCell(ix: number, iz: number) {
   return islandLift(cellCenter(ix), cellCenter(iz)) > ISLAND_LIFT_THRESHOLD;
 }
 
-// 实际渲染网格的表面高度：岛上=量化台阶，沙海=平滑。
-// 所有贴地（道具/行走/船）必须用它，和网格一致才不穿模。
+// 实际渲染网格的表面高度：岛上=量化台阶（整格平顶），沙海=按网格三角面片
+// 精确插值（解析公式与三角面在格子中部差 1-2 单位，会造成悬空/陷入）。
+// 所有贴地（道具/行走/船）必须用它，和渲染网格逐点一致。
 export function surfaceHeight(x: number, z: number) {
   const ix = cellIndex(x);
   const iz = cellIndex(z);
   if (isIslandCell(ix, iz)) return quantizedHeight(ix, iz);
-  return worldHeight(x, z);
+
+  const x0 = -TERRAIN_SIZE / 2 + ix * TERRAIN_CELL;
+  const z0 = -TERRAIN_SIZE / 2 + iz * TERRAIN_CELL;
+  const u = (x - x0) / TERRAIN_CELL;
+  const v = (z - z0) / TERRAIN_CELL;
+  const h00 = worldHeight(x0, z0);
+  const h01 = worldHeight(x0, z0 + TERRAIN_CELL);
+  const h11 = worldHeight(x0 + TERRAIN_CELL, z0 + TERRAIN_CELL);
+  const h10 = worldHeight(x0 + TERRAIN_CELL, z0);
+  // 与建网格相同的三角剖分：对角线 (0,0)-(1,1)
+  if (v >= u) return h00 + (h01 - h00) * v + (h11 - h01) * u;
+  return h00 + (h10 - h00) * u + (h11 - h10) * v;
 }
 
 // 混合地形网格：平滑贴图沙海 + Minecraft 式阶梯台地岛（平顶+垂直壁面）

@@ -31,11 +31,33 @@ const GRAVITY = 150;
 const ATTACK_DURATION = 0.6;
 
 const tempVec = new THREE.Vector3();
+const SHIP_COLLIDER_RADIUS = 34;
 
 // 混元骨骼主角（H01 v1 正版）：AnimationMixer 四态状态机；加载失败回退体素占位
 let mixer: THREE.AnimationMixer | null = null;
 const actions: Record<string, THREE.AnimationAction> = {};
 let currentAction = "";
+let riggedModel: THREE.Object3D | null = null;
+let needsReground = false;
+
+// 绑定姿态与动画姿态的脚底高度不同——首帧动画应用后按"实际姿态"包围盒重新贴地
+function regroundRigged() {
+  if (!riggedModel) return;
+  let posedBox: THREE.Box3 | null = null;
+  riggedModel.traverse((child) => {
+    const mesh = child as THREE.SkinnedMesh;
+    if (mesh.isSkinnedMesh) {
+      mesh.computeBoundingBox();
+      if (mesh.boundingBox) {
+        posedBox = posedBox ? posedBox.union(mesh.boundingBox) : mesh.boundingBox.clone();
+      }
+    }
+  });
+  if (posedBox) {
+    const box = posedBox as THREE.Box3;
+    riggedModel.position.y = -box.min.y * riggedModel.scale.y;
+  }
+}
 
 function playAction(name: string, fade = 0.18) {
   if (!mixer || currentAction === name) return;
@@ -54,12 +76,14 @@ export function createPlayerAvatar() {
   placeholder.scale.setScalar(4.2);
   rig.add(placeholder);
 
-  loadRiggedModel("/models/hero_rigged.glb")
+  loadRiggedModel("/models/hero_rigged.glb?v=blender-h01-v2")
     .then(({ scene: model, animations }) => {
       // 朝向已实测核对：模型面朝 +Z 与游戏前进方向一致，无需旋转
       fitRiggedToPlaceholder(model, placeholder);
       rig.remove(placeholder);
       rig.add(model);
+      riggedModel = model;
+      needsReground = true;
       mixer = new THREE.AnimationMixer(model);
       for (const clip of animations) {
         actions[clip.name] = mixer.clipAction(clip);
@@ -86,7 +110,12 @@ export function startAttack() {
   return true;
 }
 
-export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: number) {
+export function updatePlayer(
+  avatar: THREE.Object3D,
+  delta: number,
+  elapsed: number,
+  shipPosition: THREE.Vector3,
+) {
   const forwardInput = Number(isDown("KeyW") || isDown("ArrowUp"));
   const backInput = Number(isDown("KeyS") || isDown("ArrowDown"));
   const leftInput = Number(isDown("KeyA") || isDown("ArrowLeft"));
@@ -100,9 +129,24 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   playerState.speed = THREE.MathUtils.damp(playerState.speed, targetSpeed, 8, delta);
 
   const forward = tempVec.set(Math.sin(playerState.heading), 0, Math.cos(playerState.heading));
+  const prevX = playerState.position.x;
+  const prevZ = playerState.position.z;
   playerState.position.addScaledVector(forward, playerState.speed * delta);
   playerState.position.x = THREE.MathUtils.clamp(playerState.position.x, -1420, 1420);
   playerState.position.z = THREE.MathUtils.clamp(playerState.position.z, -1420, 1420);
+
+  // 船体圆形碰撞：只拦"靠得更近"，离开方向放行（不会把人卡在船边）
+  const shipDistNext = Math.hypot(
+    playerState.position.x - shipPosition.x,
+    playerState.position.z - shipPosition.z,
+  );
+  if (shipDistNext < SHIP_COLLIDER_RADIUS) {
+    const shipDistPrev = Math.hypot(prevX - shipPosition.x, prevZ - shipPosition.z);
+    if (shipDistNext <= shipDistPrev) {
+      playerState.position.x = prevX;
+      playerState.position.z = prevZ;
+    }
+  }
 
   // 跳跃与重力：落回网格表面高度；走上更高台阶时自动登阶
   if (playerState.grounded && consumePressed("Space")) {
@@ -125,6 +169,11 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   if (mixer) {
     // 骨骼动画状态机：攻击 > 跑 > 走 > 待机；程序化起伏让位给动画
     mixer.update(delta);
+    if (needsReground) {
+      // 首帧动画姿态生效后，按实际姿态重新贴地（修复绑定姿态偏移导致的悬空）
+      needsReground = false;
+      regroundRigged();
+    }
     if (playerState.attackTimer > 0) playAction("Attack", 0.06);
     else if (Math.abs(playerState.speed) > 2) playAction(sprinting ? "Run" : "Walk");
     else playAction("Idle");
