@@ -14,7 +14,7 @@ export function sandHeight(x: number, z: number, time = 0) {
   return broad + ripple + basin;
 }
 
-// 群洲：绿洲=凸起的方块台地岛，沙海=可航行的开阔沙面（参照 ARRR 的海洋群岛结构）
+// 群洲：绿洲=凸起的方块台地岛，沙海=平滑起伏的可航行沙面（参照 ARRR 的海洋群岛结构）
 export type IslandDef = {
   readonly id: string;
   readonly x: number;
@@ -43,7 +43,7 @@ export function islandLift(x: number, z: number) {
   return lift;
 }
 
-// 地表最终高度 = 沙海起伏 + 岛屿抬升；所有贴地/行走采样都用它
+// 平滑地表高度 = 沙海起伏 + 岛屿抬升
 export function worldHeight(x: number, z: number) {
   return sandHeight(x, z) + islandLift(x, z);
 }
@@ -51,76 +51,140 @@ export function worldHeight(x: number, z: number) {
 const TERRAIN_SIZE = 3600;
 const TERRAIN_CELL = 24;
 const TERRAIN_STEP = 8;
+const ISLAND_LIFT_THRESHOLD = 2; // 抬升超过此值的格子走方块阶梯，其余平滑
 
-function quantizedHeight(ix: number, iz: number) {
-  const half = TERRAIN_SIZE / 2;
-  const x = -half + (ix + 0.5) * TERRAIN_CELL;
-  const z = -half + (iz + 0.5) * TERRAIN_CELL;
-  return Math.round(worldHeight(x, z) / TERRAIN_STEP) * TERRAIN_STEP;
+function cellIndex(v: number) {
+  return Math.floor((v + TERRAIN_SIZE / 2) / TERRAIN_CELL);
 }
 
-// Minecraft 式阶梯方块沙丘：每格一个平顶 + 相邻落差处的垂直壁面
+function cellCenter(i: number) {
+  return -TERRAIN_SIZE / 2 + (i + 0.5) * TERRAIN_CELL;
+}
+
+function quantizedHeight(ix: number, iz: number) {
+  return Math.round(worldHeight(cellCenter(ix), cellCenter(iz)) / TERRAIN_STEP) * TERRAIN_STEP;
+}
+
+function isIslandCell(ix: number, iz: number) {
+  return islandLift(cellCenter(ix), cellCenter(iz)) > ISLAND_LIFT_THRESHOLD;
+}
+
+// 实际渲染网格的表面高度：岛上=量化台阶，沙海=平滑。
+// 所有贴地（道具/行走/船）必须用它，和网格一致才不穿模。
+export function surfaceHeight(x: number, z: number) {
+  const ix = cellIndex(x);
+  const iz = cellIndex(z);
+  if (isIslandCell(ix, iz)) return quantizedHeight(ix, iz);
+  return worldHeight(x, z);
+}
+
+// 混合地形网格：平滑贴图沙海 + Minecraft 式阶梯台地岛（平顶+垂直壁面）
 export function createTerrain() {
-  const half = TERRAIN_SIZE / 2;
   const cells = TERRAIN_SIZE / TERRAIN_CELL;
   const positions: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   const topColor = new THREE.Color();
   const wallColor = new THREE.Color();
+  const UV_SCALE = 150; // 贴图每 150 世界单位平铺一次
 
   type P = [number, number, number];
   const pushQuad = (a: P, b: P, c: P, d: P, color: THREE.Color) => {
-    positions.push(...a, ...b, ...c, ...a, ...c, ...d);
-    for (let i = 0; i < 6; i += 1) colors.push(color.r, color.g, color.b);
+    for (const p of [a, b, c, a, c, d]) {
+      positions.push(...p);
+      colors.push(color.r, color.g, color.b);
+      uvs.push(p[0] / UV_SCALE, p[2] / UV_SCALE);
+    }
   };
 
-  const rockColor = new THREE.Color("#8f7a4e");
+  const rockColor = new THREE.Color("#9a835a");
   const cellColor = (ix: number, iz: number, h: number, target: THREE.Color) => {
-    const x = -half + (ix + 0.5) * TERRAIN_CELL;
-    const z = -half + (iz + 0.5) * TERRAIN_CELL;
+    const x = cellCenter(ix);
+    const z = cellCenter(iz);
     const dune = THREE.MathUtils.clamp((h + 32) / 76, 0, 1);
     target.copy(palette.sandLow).lerp(palette.sandHigh, dune);
     if ((x + z) % 560 > 440) target.lerp(palette.salt, 0.28);
     const lift = islandLift(x, z);
-    if (lift > 2) {
+    if (lift > ISLAND_LIFT_THRESHOLD) {
       target.lerp(rockColor, THREE.MathUtils.clamp(lift / 26, 0, 1) * 0.4);
     }
+    // 顶点色要与贴图相乘：整体提亮避免画面发闷
+    target.lerp(new THREE.Color("#ffffff"), 0.42);
     return target;
   };
 
   for (let ix = 0; ix < cells; ix += 1) {
     for (let iz = 0; iz < cells; iz += 1) {
-      const h = quantizedHeight(ix, iz);
-      const x0 = -half + ix * TERRAIN_CELL;
+      const x0 = -TERRAIN_SIZE / 2 + ix * TERRAIN_CELL;
       const x1 = x0 + TERRAIN_CELL;
-      const z0 = -half + iz * TERRAIN_CELL;
+      const z0 = -TERRAIN_SIZE / 2 + iz * TERRAIN_CELL;
       const z1 = z0 + TERRAIN_CELL;
+      const island = isIslandCell(ix, iz);
 
-      cellColor(ix, iz, h, topColor);
-      pushQuad([x0, h, z0], [x0, h, z1], [x1, h, z1], [x1, h, z0], topColor);
-      wallColor.copy(topColor).multiplyScalar(0.6);
+      if (island) {
+        const h = quantizedHeight(ix, iz);
+        cellColor(ix, iz, h, topColor);
+        pushQuad([x0, h, z0], [x0, h, z1], [x1, h, z1], [x1, h, z0], topColor);
+        wallColor.copy(topColor).multiplyScalar(0.74);
 
-      if (ix + 1 < cells) {
-        const hn = quantizedHeight(ix + 1, iz);
-        if (hn !== h) {
-          const lo = Math.min(h, hn);
-          const hi = Math.max(h, hn);
-          if (h > hn) {
-            pushQuad([x1, hi, z0], [x1, hi, z1], [x1, lo, z1], [x1, lo, z0], wallColor);
+        // +x 方向壁面
+        if (ix + 1 < cells) {
+          if (isIslandCell(ix + 1, iz)) {
+            const hn = quantizedHeight(ix + 1, iz);
+            if (hn !== h) {
+              const lo = Math.min(h, hn);
+              const hi = Math.max(h, hn);
+              if (h > hn) pushQuad([x1, hi, z0], [x1, hi, z1], [x1, lo, z1], [x1, lo, z0], wallColor);
+              else pushQuad([x1, hi, z1], [x1, hi, z0], [x1, lo, z0], [x1, lo, z1], wallColor);
+            }
           } else {
-            pushQuad([x1, hi, z1], [x1, hi, z0], [x1, lo, z0], [x1, lo, z1], wallColor);
+            const s0 = worldHeight(x1, z0);
+            const s1 = worldHeight(x1, z1);
+            if (h > Math.min(s0, s1)) {
+              pushQuad([x1, h, z0], [x1, h, z1], [x1, s1, z1], [x1, s0, z0], wallColor);
+            }
           }
         }
-      }
-      if (iz + 1 < cells) {
-        const hn = quantizedHeight(ix, iz + 1);
-        if (hn !== h) {
-          const lo = Math.min(h, hn);
-          const hi = Math.max(h, hn);
-          if (h > hn) {
-            pushQuad([x1, hi, z1], [x0, hi, z1], [x0, lo, z1], [x1, lo, z1], wallColor);
+        // +z 方向壁面
+        if (iz + 1 < cells) {
+          if (isIslandCell(ix, iz + 1)) {
+            const hn = quantizedHeight(ix, iz + 1);
+            if (hn !== h) {
+              const lo = Math.min(h, hn);
+              const hi = Math.max(h, hn);
+              if (h > hn) pushQuad([x1, hi, z1], [x0, hi, z1], [x0, lo, z1], [x1, lo, z1], wallColor);
+              else pushQuad([x0, hi, z1], [x1, hi, z1], [x1, lo, z1], [x0, lo, z1], wallColor);
+            }
           } else {
-            pushQuad([x0, hi, z1], [x1, hi, z1], [x1, lo, z1], [x0, lo, z1], wallColor);
+            const s0 = worldHeight(x0, z1);
+            const s1 = worldHeight(x1, z1);
+            if (h > Math.min(s0, s1)) {
+              pushQuad([x1, h, z1], [x0, h, z1], [x0, s0, z1], [x1, s1, z1], wallColor);
+            }
+          }
+        }
+      } else {
+        // 平滑沙海格：四角取平滑高度，相邻格共享角点高度=连续无缝
+        const h00 = worldHeight(x0, z0);
+        const h01 = worldHeight(x0, z1);
+        const h11 = worldHeight(x1, z1);
+        const h10 = worldHeight(x1, z0);
+        cellColor(ix, iz, (h00 + h11) / 2, topColor);
+        pushQuad([x0, h00, z0], [x0, h01, z1], [x1, h11, z1], [x1, h10, z0], topColor);
+
+        // 沙海格紧挨岛格时，从岛壁底部兜住缝隙（岛侧已出壁面，这里补朝向岛的反面）
+        if (ix + 1 < cells && isIslandCell(ix + 1, iz)) {
+          const hn = quantizedHeight(ix + 1, iz);
+          if (hn > Math.min(h10, h11)) {
+            wallColor.copy(topColor).multiplyScalar(0.74);
+            pushQuad([x1, hn, z1], [x1, hn, z0], [x1, h10, z0], [x1, h11, z1], wallColor);
+          }
+        }
+        if (iz + 1 < cells && isIslandCell(ix, iz + 1)) {
+          const hn = quantizedHeight(ix, iz + 1);
+          if (hn > Math.min(h01, h11)) {
+            wallColor.copy(topColor).multiplyScalar(0.74);
+            pushQuad([x0, hn, z1], [x1, hn, z1], [x1, h11, z1], [x0, h01, z1], wallColor);
           }
         }
       }
@@ -130,13 +194,21 @@ export function createTerrain() {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.computeVertexNormals();
+
+  // 沙面纹理：Poly Haven aerial_beach_01（CC0），与顶点色相乘
+  const sandTexture = new THREE.TextureLoader().load("/textures/sand_diff_1k.jpg");
+  sandTexture.wrapS = THREE.RepeatWrapping;
+  sandTexture.wrapT = THREE.RepeatWrapping;
+  sandTexture.colorSpace = THREE.SRGBColorSpace;
 
   const terrain = new THREE.Mesh(
     geometry,
     new THREE.MeshLambertMaterial({
       vertexColors: true,
       flatShading: true,
+      map: sandTexture,
     }),
   );
 

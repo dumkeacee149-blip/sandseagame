@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { palette } from "../core/palette";
 import { mat, box } from "../core/materials";
 import { hunyuanSlot } from "../core/models";
-import { sandHeight, worldHeight } from "./sand";
+import { surfaceHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
 
 // 可劈碎的货箱：攻击系统的打击目标，劈碎掉战利品
@@ -50,10 +50,11 @@ function placeEnv(
   return slot;
 }
 
-// 只按顶层子节点贴地，避免拆散体素资产的内部结构
+// 只按顶层子节点贴地，避免拆散体素资产的内部结构。
+// 必须用 surfaceHeight（渲染网格的实际表面），用平滑公式会差出半个台阶=穿模
 function groundChildren(group: THREE.Group) {
   group.children.forEach((child) => {
-    child.position.y += worldHeight(
+    child.position.y += surfaceHeight(
       group.position.x + child.position.x,
       group.position.z + child.position.z,
     );
@@ -190,12 +191,12 @@ export function createSaltFlats() {
       const placeholder = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
       placeholder.position.y = 4;
       const cluster = hunyuanSlot(placeholder, i % 2 === 0 ? "/models/salt_a.glb" : "/models/salt_b.glb");
-      cluster.position.set(x, worldHeight(x, z), z);
+      cluster.position.set(x, surfaceHeight(x, z), z);
       cluster.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
       group.add(cluster);
     } else {
       const shard = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
-      shard.position.set(x, worldHeight(x, z) + 1, z);
+      shard.position.set(x, surfaceHeight(x, z) + 1, z);
       shard.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
       group.add(shard);
     }
@@ -209,7 +210,7 @@ export function createSeaScatter() {
 
   for (const rock of SEA_OBSTACLES) {
     const slot = envSlot(`/models/${rock.model}.glb`, rock.fp, rock.fp * 0.8);
-    slot.position.set(rock.x, worldHeight(rock.x, rock.z) - 2, rock.z);
+    slot.position.set(rock.x, surfaceHeight(rock.x, rock.z) - 2, rock.z);
     slot.rotation.y = rock.rot;
     group.add(slot);
   }
@@ -222,7 +223,7 @@ export function createSeaScatter() {
   ];
   deadwoodSpots.forEach(([x, z, rot]) => {
     const slot = envSlot("/models/deadwood.glb", 30, 40);
-    slot.position.set(x, worldHeight(x, z) - 1, z);
+    slot.position.set(x, surfaceHeight(x, z) - 1, z);
     slot.rotation.y = rot;
     group.add(slot);
   });
@@ -234,7 +235,7 @@ export function createSeaScatter() {
   ];
   ribSpots.forEach(([x, z, rot, fp]) => {
     const slot = envSlot("/models/ribs.glb", fp, fp * 0.5);
-    slot.position.set(x, worldHeight(x, z) - 1.5, z);
+    slot.position.set(x, surfaceHeight(x, z) - 1.5, z);
     slot.rotation.y = rot;
     group.add(slot);
   });
@@ -296,7 +297,7 @@ export function createDistantCaravans() {
     const caravan = hunyuanSlot(placeholder, "/models/cart.glb");
     const x = -780 + i * 108;
     const z = 560 + Math.sin(i) * 34;
-    caravan.position.set(x, sandHeight(x, z), z);
+    caravan.position.set(x, surfaceHeight(x, z), z);
     caravan.rotation.y = -0.58;
     group.add(caravan);
   }

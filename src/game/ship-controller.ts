@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { isDown } from "../core/input";
-import { sandHeight, islandLift } from "../world/sand";
+import { surfaceHeight, islandLift } from "../world/sand";
 import { SEA_OBSTACLES } from "../world/landmarks";
 
 export type ShipState = {
@@ -54,7 +54,7 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   shipState.position.x = THREE.MathUtils.clamp(shipState.position.x, -1420, 1420);
   shipState.position.z = THREE.MathUtils.clamp(shipState.position.z, -1420, 1420);
   shipState.position.y =
-    sandHeight(shipState.position.x, shipState.position.z) + 1.2 + Math.sin(elapsed * 4) * 0.9;
+    surfaceHeight(shipState.position.x, shipState.position.z) + 1.2 + Math.sin(elapsed * 4) * 0.9;
 
   ship.position.copy(shipState.position);
   ship.rotation.y = shipState.heading;

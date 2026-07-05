@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { isDown, consumePressed } from "../core/input";
-import { worldHeight } from "../world/sand";
+import { surfaceHeight } from "../world/sand";
 import { hunyuanSlot } from "../core/models";
 import { createVoxelAsset } from "../voxel-assets";
 
@@ -81,14 +81,14 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   playerState.position.x = THREE.MathUtils.clamp(playerState.position.x, -1420, 1420);
   playerState.position.z = THREE.MathUtils.clamp(playerState.position.z, -1420, 1420);
 
-  // 跳跃与重力：落回 worldHeight；走上更高台阶时自动登阶
+  // 跳跃与重力：落回网格表面高度；走上更高台阶时自动登阶
   if (playerState.grounded && consumePressed("Space")) {
     playerState.verticalVelocity = JUMP_VELOCITY;
     playerState.grounded = false;
   }
   playerState.verticalVelocity -= GRAVITY * delta;
   let nextY = playerState.position.y + playerState.verticalVelocity * delta;
-  const ground = worldHeight(playerState.position.x, playerState.position.z);
+  const ground = surfaceHeight(playerState.position.x, playerState.position.z);
   if (nextY <= ground) {
     nextY = ground;
     playerState.verticalVelocity = 0;
