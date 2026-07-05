@@ -260,6 +260,7 @@ if (import.meta.env.DEV) {
     goAshore,
     boardShip,
     clearSave,
+    scene,
   };
 }
 
@@ -301,7 +302,7 @@ function animate() {
   clearFramePresses();
 
   updateSplinters(delta);
-  updateWorm(worm, elapsed);
+  updateWorm(worm, elapsed, delta);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;

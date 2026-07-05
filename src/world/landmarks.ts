@@ -61,8 +61,9 @@ function groundChildren(group: THREE.Group) {
 }
 
 export function createPalm(position: THREE.Vector3, scale = 1) {
+  // palm.glb 是瘦高型：脚印缩放会放大高度，占位取 7 让树冠回到玩家 2-3 倍身高
   const placeholder = createVoxelAsset("A04");
-  placeholder.scale.setScalar(11 * scale);
+  placeholder.scale.setScalar(7 * scale);
   const palm = hunyuanSlot(placeholder, "/models/palm.glb");
   palm.position.copy(position);
   palm.rotation.y = Math.random() * Math.PI * 2;
