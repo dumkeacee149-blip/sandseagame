@@ -158,3 +158,116 @@ h1 {
 .action-chip.visible {
   opacity: 1;
 }
+
+.minimap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 233, 184, 0.3);
+  box-shadow: 0 8px 26px rgba(20, 10, 0, 0.35);
+  pointer-events: none;
+}
+
+.trade-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(430px, calc(100vw - 40px));
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 233, 184, 0.28);
+  background: rgba(22, 16, 11, 0.92);
+  color: #f8edd6;
+  backdrop-filter: blur(14px);
+  z-index: 20;
+}
+
+.trade-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.trade-eyebrow {
+  margin: 0;
+  color: #7ce8d8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trade-stats {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+}
+
+.trade-close {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 233, 184, 0.12);
+  color: #f8edd6;
+  cursor: pointer;
+}
+
+.trade-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 233, 184, 0.1);
+}
+
+.trade-good b {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.trade-good span {
+  color: rgba(248, 237, 214, 0.6);
+  font-size: 0.78rem;
+}
+
+.trade-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.trade-actions button {
+  border: 1px solid rgba(124, 232, 216, 0.35);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: rgba(124, 232, 216, 0.12);
+  color: #cdf6ee;
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trade-actions button[data-action="sell"] {
+  border-color: rgba(255, 200, 120, 0.35);
+  background: rgba(255, 200, 120, 0.1);
+  color: #ffe2b0;
+}
+
+.trade-actions button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.trade-na {
+  color: rgba(248, 237, 214, 0.3);
+  padding: 0 20px;
+}
+
+.trade-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  color: rgba(248, 237, 214, 0.5);
+  font-size: 0.78rem;
+}

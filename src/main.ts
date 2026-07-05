@@ -30,8 +30,11 @@ import {
   startAttack,
 } from "./game/player";
 import { updateHud } from "./ui/hud";
+import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
+import { initMinimap, updateMinimap } from "./ui/minimap";
 import { getState, setState } from "./game/store";
 import { addGold } from "./game/economy";
+import { PORTS } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -179,6 +182,16 @@ function updateSplinters(delta: number) {
 
 const hitProbe = new THREE.Vector3();
 const crateWorldPos = new THREE.Vector3();
+const marketProbe = new THREE.Vector3();
+
+// 步行时最近的可交易集市（帐篷前 48 单位内）
+function findNearbyMarket() {
+  for (const port of PORTS) {
+    marketProbe.set(port.marketX, player.position.y, port.marketZ);
+    if (player.position.distanceTo(marketProbe) < 48) return port;
+  }
+  return null;
+}
 
 function tryBreakCrates() {
   hitProbe
@@ -207,6 +220,7 @@ function onResize() {
 window.addEventListener("resize", onResize);
 initInput();
 initMouse();
+initMinimap();
 
 // 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
 if (import.meta.env.DEV) {
@@ -240,13 +254,30 @@ function animate() {
     const canGoAshore = Math.abs(shipState.speed) < 8;
     setAction(canGoAshore ? "Press E to go ashore" : null);
     if (canGoAshore && consumePressed("KeyE")) goAshore();
+  } else if (isTradePanelOpen()) {
+    // 交易中：世界暂停接收输入，E/Esc 离开集市
+    updateWalkCamera(camera, player, delta);
+    if (consumePressed("KeyE") || consumePressed("Escape")) closeTradePanel();
   } else {
     updatePlayer(player, delta, elapsed);
     updateWalkCamera(camera, player, delta);
     if (consumeClick() && startAttack()) tryBreakCrates();
+    const market = findNearbyMarket();
     const nearShip = player.position.distanceTo(ship.position) < 60;
-    setAction(nearShip ? "Press E to board the skiff" : null);
-    if (nearShip && consumePressed("KeyE")) boardShip();
+    setAction(
+      market
+        ? `Press E to trade at ${market.name}`
+        : nearShip
+          ? "Press E to board the skiff"
+          : null,
+    );
+    if (market && consumePressed("KeyE")) {
+      playerState.speed = 0;
+      setAction(null);
+      openTradePanel(market.id);
+    } else if (nearShip && consumePressed("KeyE")) {
+      boardShip();
+    }
   }
   clearFramePresses();
 
@@ -256,6 +287,7 @@ function animate() {
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
   updateHud(getState(), shipState.speed, ship.position);
+  updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", worm.position, elapsed);
   renderer.render(scene, camera);
 }
 

@@ -21,9 +21,12 @@ export interface PortDef {
   readonly name: string;
   readonly x: number;
   readonly z: number;
-  // 产地卖给玩家的价格；null = 本港不出售此货
+  // 集市帐篷的世界坐标：小人走到这里按 E 交易
+  readonly marketX: number;
+  readonly marketZ: number;
+  // 产地卖给玩家的价格；缺省 = 本港不出售此货
   readonly buy: Readonly<Partial<Record<GoodId, number>>>;
-  // 本港回收价；null = 本港不回收（产地不回购自产货）
+  // 本港回收价；缺省 = 本港不回收（产地不回购自产货）
   readonly sell: Readonly<Partial<Record<GoodId, number>>>;
 }
 
@@ -34,6 +37,8 @@ export const PORTS: readonly PortDef[] = [
     name: "Oasis Harbor",
     x: -520,
     z: -380,
+    marketX: -644,
+    marketZ: -408,
     buy: { dates: 4, glassware: 10 },
     sell: { salt: 8, spice: 26 },
   },
@@ -42,6 +47,8 @@ export const PORTS: readonly PortDef[] = [
     name: "Saltcrest",
     x: 340,
     z: 700,
+    marketX: 300,
+    marketZ: 670,
     buy: { salt: 5 },
     sell: { dates: 7, glassware: 13, spice: 22 },
   },
@@ -50,6 +57,8 @@ export const PORTS: readonly PortDef[] = [
     name: "Duneskull Outpost",
     x: 1150,
     z: -1150,
+    marketX: 1150,
+    marketZ: -1150,
     buy: { spice: 12 },
     sell: { dates: 10, salt: 9, glassware: 19 },
   },
