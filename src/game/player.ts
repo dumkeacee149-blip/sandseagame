@@ -76,7 +76,7 @@ export function createPlayerAvatar() {
   placeholder.scale.setScalar(4.2);
   rig.add(placeholder);
 
-  loadRiggedModel("/models/hero_rigged.glb?v=blender-h01-v2")
+  loadRiggedModel("/models/hero_rigged.glb?v=blender-h01-v3")
     .then(({ scene: model, animations }) => {
       // 朝向已实测核对：模型面朝 +Z 与游戏前进方向一致，无需旋转
       fitRiggedToPlaceholder(model, placeholder);

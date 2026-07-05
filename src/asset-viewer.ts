@@ -35,8 +35,8 @@ const hunyuanAssetPaths = {
   A08: "/assets/hunyuan/raw/A08_hunyuan_relic_chest_v1.glb",
   A09: "/assets/hunyuan/raw/A09_hunyuan_harpoon_cannon_v1.glb",
   A10: "/assets/hunyuan/raw/A10_hunyuan_caravan_cart_v1.glb",
-  H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb?v=blender-h01-v2",
-  H02: "/assets/hunyuan/raw/H02_sand_leviathan_rigged_v1.glb?v=blender-h02-v2",
+  H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb?v=blender-h01-v3",
+  H02: "/assets/hunyuan/raw/H02_sand_leviathan_rigged_v1.glb?v=blender-h02-v3",
 } as const;
 let selectedIndex = Math.max(
   0,
@@ -209,6 +209,9 @@ function fitAsset(asset: THREE.Group, targetExtent: number) {
 }
 
 function applyReviewPose(asset: THREE.Group, assetId: string) {
+  if (assetId === "H01") {
+    asset.rotation.y = -Math.PI * 0.14;
+  }
   if (assetId === "H02") {
     asset.rotation.y = -Math.PI * 0.22;
   }
@@ -451,7 +454,8 @@ async function showAsset(index: number) {
   rebuildTabs();
 
   const asset = await createPreferredAsset(index);
-  fitAsset(asset, window.innerWidth < 760 ? 4.25 : 5.2);
+  const reviewExtent = definition.id === "H02" ? 6.2 : window.innerWidth < 760 ? 4.25 : 5.2;
+  fitAsset(asset, reviewExtent);
   applyReviewPose(asset, definition.id);
   asset.position.y += 0.1;
   activeAsset = asset;

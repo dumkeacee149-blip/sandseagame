@@ -70,6 +70,15 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   ship.rotation.x = Math.sin(elapsed * 2.6) * 0.025 + shipState.speed * 0.0007;
 }
 
+// 船的视觉体与逻辑坐标同步：任何模式下每帧调用（步行时船也要贴地/停在正确位置，
+// 否则碰撞、登船提示、航向牌全部参照过期位置）
+export function syncShipVisual(ship: THREE.Object3D, elapsed: number) {
+  shipState.position.y =
+    surfaceHeight(shipState.position.x, shipState.position.z) + 1.2 + Math.sin(elapsed * 4) * 0.9;
+  ship.position.copy(shipState.position);
+  ship.rotation.y = shipState.heading;
+}
+
 export type CameraOrbit = { yaw: number; pitch: number };
 
 export function updateCamera(

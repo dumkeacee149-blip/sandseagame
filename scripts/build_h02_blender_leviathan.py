@@ -41,9 +41,12 @@ def make_materials():
     return {
         "shell": make_mat("h02_voxel_burnt_red_shell", (0.58, 0.16, 0.08, 1.0)),
         "shell_hi": make_mat("h02_voxel_sunlit_shell", (0.76, 0.27, 0.12, 1.0)),
+        "shell_tip": make_mat("h02_voxel_hot_shell_edges", (0.90, 0.38, 0.16, 1.0)),
         "shell_dark": make_mat("h02_voxel_dark_plate_gaps", (0.23, 0.07, 0.04, 1.0)),
         "belly": make_mat("h02_voxel_sand_belly", (0.66, 0.45, 0.27, 1.0)),
+        "belly_dark": make_mat("h02_voxel_shadowed_belly", (0.46, 0.28, 0.16, 1.0)),
         "bone": make_mat("h02_voxel_ivory_bone", (0.83, 0.74, 0.55, 1.0)),
+        "bone_dark": make_mat("h02_voxel_old_bone_edges", (0.58, 0.48, 0.34, 1.0)),
         "claw": make_mat("h02_voxel_dark_claw", (0.18, 0.11, 0.08, 1.0)),
         "eye": make_mat("h02_voxel_teal_eye", (0.0, 0.86, 0.78, 1.0)),
         "shadow": make_mat("h02_voxel_mouth_shadow", (0.06, 0.03, 0.025, 1.0)),
@@ -171,26 +174,58 @@ def add_body(builder):
         builder.add_box((0.09, length * 0.98, 0.27), (0.0, y - 0.02, top_z - 0.02), "shell_dark", bone)
         builder.add_box((0.24, length * 0.76, 0.22), (-width * 0.54, y, belly_z + 0.08), "bone", bone)
         builder.add_box((0.24, length * 0.76, 0.22), (width * 0.54, y, belly_z + 0.08), "bone", bone)
+        builder.add_box((width * 0.34, length * 0.18, 0.11), (0.0, y - length * 0.29, top_z + 0.16), "shell_tip", bone)
+        builder.add_box((width * 0.38, length * 0.16, 0.10), (0.0, y + length * 0.03, top_z + 0.17), "shell_tip", bone)
+        builder.add_box((width * 0.30, length * 0.15, 0.09), (0.0, y + length * 0.31, top_z + 0.14), "shell", bone)
+        builder.add_box((0.08, length * 0.64, 0.10), (-width * 0.18, y, top_z + 0.12), "shell_dark", bone)
+        builder.add_box((0.08, length * 0.64, 0.10), (width * 0.18, y, top_z + 0.12), "shell_dark", bone)
+        builder.add_box((width * 0.18, length * 0.18, 0.14), (-width * 0.42, y - length * 0.22, belly_z + 0.26), "bone_dark", bone)
+        builder.add_box((width * 0.18, length * 0.18, 0.14), (width * 0.42, y - length * 0.22, belly_z + 0.26), "bone_dark", bone)
+        builder.add_box((width * 0.20, length * 0.18, 0.13), (-width * 0.43, y + length * 0.20, belly_z + 0.22), "bone", bone)
+        builder.add_box((width * 0.20, length * 0.18, 0.13), (width * 0.43, y + length * 0.20, belly_z + 0.22), "bone", bone)
+        builder.add_box((width * 0.52, length * 0.16, 0.09), (0.0, y + length * 0.34, belly_z - height * 0.21), "belly_dark", bone)
 
         if idx in (2, 3, 4, 5, 6):
             builder.add_box((0.18, 0.22, 0.38), (-0.34, y - 0.05, top_z + 0.28), "claw", bone)
             builder.add_box((0.18, 0.22, 0.38), (0.34, y - 0.05, top_z + 0.28), "claw", bone)
+            builder.add_box((0.12, 0.16, 0.28), (0.0, y + 0.18, top_z + 0.24), "claw", bone)
         if idx in (2, 3, 4, 5):
             for side in (-1, 1):
                 sx = side * width * 0.56
                 builder.add_box(
-                    (0.24, 0.25, 0.58),
-                    (sx + side * 0.16, y - 0.10, belly_z - 0.28),
+                    (0.24, 0.24, 0.42),
+                    (sx + side * 0.13, y - 0.09, belly_z - 0.18),
                     "claw",
                     bone,
                     rotation=(0.0, side * 0.30, side * 0.34),
                 )
                 builder.add_box(
-                    (0.30, 0.20, 0.34),
-                    (sx + side * 0.39, y - 0.22, belly_z - 0.54),
+                    (0.20, 0.22, 0.40),
+                    (sx + side * 0.29, y - 0.18, belly_z - 0.43),
+                    "claw",
+                    bone,
+                    rotation=(0.08, side * 0.36, side * 0.56),
+                )
+                builder.add_box(
+                    (0.22, 0.18, 0.18),
+                    (sx + side * 0.24, y - 0.12, belly_z - 0.30),
+                    "bone_dark",
+                    bone,
+                    rotation=(0.0, side * 0.24, side * 0.44),
+                )
+                builder.add_box(
+                    (0.30, 0.18, 0.22),
+                    (sx + side * 0.47, y - 0.30, belly_z - 0.66),
                     "bone",
                     bone,
-                    rotation=(0.10, side * 0.42, side * 0.55),
+                    rotation=(0.12, side * 0.48, side * 0.68),
+                )
+                builder.add_box(
+                    (0.13, 0.12, 0.24),
+                    (sx + side * 0.61, y - 0.36, belly_z - 0.69),
+                    "bone",
+                    bone,
+                    rotation=(0.02, side * 0.64, side * 0.72),
                 )
 
 
@@ -198,19 +233,42 @@ def add_head(builder):
     builder.add_box((1.46, 0.72, 0.72), (0.0, -2.03, 0.73), "shell", "head")
     builder.add_box((1.16, 0.32, 0.26), (0.0, -2.38, 1.03), "shell_dark", "head")
     builder.add_box((1.05, 0.30, 0.38), (0.0, -2.53, 0.78), "shell_hi", "head")
+    builder.add_box((0.72, 0.18, 0.16), (0.0, -2.18, 1.18), "shell_tip", "head")
+    builder.add_box((0.48, 0.16, 0.16), (0.0, -2.50, 1.20), "shell", "head")
+    builder.add_box((0.12, 0.54, 0.18), (-0.46, -2.20, 1.02), "shell_dark", "head")
+    builder.add_box((0.12, 0.54, 0.18), (0.46, -2.20, 1.02), "shell_dark", "head")
     builder.add_box((0.82, 0.30, 0.18), (0.0, -2.70, 1.05), "bone", "jaw_upper")
     builder.add_box((0.78, 0.36, 0.18), (0.0, -2.66, 0.38), "bone", "jaw_lower")
     builder.add_box((0.68, 0.20, 0.20), (0.0, -2.66, 0.69), "shadow", "head")
+    builder.add_box((0.48, 0.06, 0.08), (0.0, -2.84, 0.68), "shadow", "head")
+    builder.add_box((0.12, 0.06, 0.08), (-0.22, -2.88, 0.86), "shadow", "head")
+    builder.add_box((0.12, 0.06, 0.08), (0.22, -2.88, 0.86), "shadow", "head")
 
     for side in (-1, 1):
-        builder.add_box((0.16, 0.055, 0.14), (side * 0.34, -2.72, 0.90), "eye", "head")
+        builder.add_box((0.22, 0.07, 0.17), (side * 0.34, -2.73, 0.91), "eye", "head")
+        builder.add_box((0.30, 0.08, 0.09), (side * 0.34, -2.70, 1.03), "bone_dark", "head")
         builder.add_box((0.22, 0.40, 0.36), (side * 0.72, -2.18, 0.58), "bone", "head")
+        builder.add_box((0.18, 0.34, 0.20), (side * 0.86, -2.28, 0.76), "bone_dark", "head")
         builder.add_box(
             (0.14, 0.12, 0.45),
             (side * 0.36, -2.88, 0.72),
             "bone",
             "jaw_upper",
             rotation=(0.28, side * 0.20, 0.0),
+        )
+        builder.add_box(
+            (0.10, 0.10, 0.30),
+            (side * 0.12, -2.90, 0.74),
+            "bone",
+            "jaw_upper",
+            rotation=(0.25, side * 0.10, 0.0),
+        )
+        builder.add_box(
+            (0.10, 0.10, 0.30),
+            (side * 0.58, -2.82, 0.70),
+            "bone_dark",
+            "jaw_upper",
+            rotation=(0.34, side * 0.28, 0.0),
         )
         builder.add_box(
             (0.12, 0.11, 0.36),
@@ -220,11 +278,32 @@ def add_head(builder):
             rotation=(-0.24, side * 0.12, 0.0),
         )
         builder.add_box(
+            (0.09, 0.10, 0.24),
+            (side * 0.10, -2.88, 0.48),
+            "bone",
+            "jaw_lower",
+            rotation=(-0.22, side * 0.08, 0.0),
+        )
+        builder.add_box(
             (0.16, 0.18, 0.42),
             (side * 0.62, -2.02, 1.12),
             "claw",
             "head",
             rotation=(0.0, side * 0.30, 0.0),
+        )
+        builder.add_box(
+            (0.12, 0.18, 0.34),
+            (side * 0.42, -1.76, 1.20),
+            "claw",
+            "head",
+            rotation=(0.0, side * 0.22, side * 0.10),
+        )
+        builder.add_box(
+            (0.14, 0.34, 0.12),
+            (side * 0.92, -2.06, 0.46),
+            "bone",
+            "head",
+            rotation=(0.0, side * 0.36, side * 0.12),
         )
 
 
@@ -232,8 +311,18 @@ def add_tail(builder):
     builder.add_box((0.96, 0.58, 0.42), (0.0, 2.58, 0.57), "shell", "tail_01")
     builder.add_box((0.70, 0.60, 0.32), (0.0, 3.06, 0.50), "shell_dark", "tail_01")
     builder.add_box((0.46, 0.58, 0.24), (0.0, 3.50, 0.45), "bone", "tail_02")
+    builder.add_box((0.62, 0.22, 0.18), (0.0, 2.54, 0.84), "shell_hi", "tail_01")
+    builder.add_box((0.48, 0.20, 0.16), (0.0, 2.90, 0.75), "shell", "tail_01")
+    builder.add_box((0.34, 0.20, 0.14), (0.0, 3.26, 0.66), "shell_tip", "tail_02")
+    builder.add_box((0.16, 0.34, 0.16), (-0.38, 2.70, 0.52), "bone", "tail_01")
+    builder.add_box((0.16, 0.34, 0.16), (0.38, 2.70, 0.52), "bone", "tail_01")
+    builder.add_box((0.13, 0.28, 0.13), (-0.28, 3.18, 0.45), "bone_dark", "tail_02")
+    builder.add_box((0.13, 0.28, 0.13), (0.28, 3.18, 0.45), "bone_dark", "tail_02")
     builder.add_box((0.18, 0.34, 0.34), (0.0, 3.28, 0.78), "claw", "tail_02", rotation=(0.25, 0.0, 0.0))
+    builder.add_box((0.14, 0.24, 0.26), (-0.20, 3.42, 0.66), "claw", "tail_02", rotation=(0.12, 0.18, 0.0))
+    builder.add_box((0.14, 0.24, 0.26), (0.20, 3.42, 0.66), "claw", "tail_02", rotation=(0.12, -0.18, 0.0))
     builder.add_box((0.38, 0.24, 0.16), (0.0, 3.80, 0.43), "bone", "tail_02", rotation=(0.0, 0.0, 0.0))
+    builder.add_box((0.26, 0.14, 0.12), (0.0, 3.98, 0.44), "bone_dark", "tail_02", rotation=(0.0, 0.0, 0.0))
 
 
 def build_mesh(armature, bone_names):

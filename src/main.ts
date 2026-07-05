@@ -30,7 +30,7 @@ import {
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
 import { createMarketMarkers, updateMarkers } from "./world/markers";
-import { shipState, updateShip, updateCamera } from "./game/ship-controller";
+import { shipState, updateShip, updateCamera, syncShipVisual } from "./game/ship-controller";
 import {
   playerState,
   createPlayerAvatar,
@@ -319,6 +319,8 @@ if (import.meta.env.DEV) {
     },
     getMode: () => mode,
     getPlayerY: () => playerState.position.y,
+    getPlayerPos: () => ({ x: playerState.position.x, y: playerState.position.y, z: playerState.position.z }),
+    getShipPos: () => ({ x: shipState.position.x, z: shipState.position.z }),
     getState,
     setState,
     goAshore,
@@ -408,6 +410,8 @@ function animate() {
   }
   clearFramePresses();
 
+  // 步行/交易模式下船不受控但仍要贴地并停在逻辑位置（航行模式下等价于重复赋值）
+  syncShipVisual(ship, elapsed);
   updateSplinters(delta);
   updateWorm(worm, elapsed, delta);
   updateMarkers(elapsed);
