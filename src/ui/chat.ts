@@ -62,12 +62,52 @@ function closeChatInput() {
   setKeyCapture(false);
 }
 
+// 全服 transport：配置 VITE_CHAT_WS_URL 后走 WebSocket；否则本地回显模式
+let socket: WebSocket | null = null;
+let socketReady = false;
+
+function connectGlobalChat() {
+  const url = import.meta.env.VITE_CHAT_WS_URL as string | undefined;
+  if (!url) return;
+  try {
+    socket = new WebSocket(url);
+    socket.addEventListener("open", () => {
+      socketReady = true;
+      const badge = document.querySelector(".chat-local");
+      if (badge) badge.textContent = "GLOBAL";
+      appendMessage("Harbormaster", "Connected to the global Harbor Band.", "npc");
+    });
+    socket.addEventListener("message", (event) => {
+      try {
+        const { author, text } = JSON.parse(event.data);
+        if (typeof author === "string" && typeof text === "string") {
+          appendMessage(author, text, "player");
+        }
+      } catch {
+        // 忽略无法解析的帧
+      }
+    });
+    const fallback = () => {
+      socketReady = false;
+      socket = null;
+    };
+    socket.addEventListener("close", fallback);
+    socket.addEventListener("error", fallback);
+  } catch (error) {
+    console.error("全服聊天连接失败，回退本地模式", error);
+  }
+}
+
 function sendCurrent() {
   if (!inputEl) return;
   const text = inputEl.value.trim();
   if (text) {
-    // 本地模式：直接回显；接入 WebSocket 后改为 transport.send(text)
-    appendMessage("Captain (you)", text, "player");
+    if (socket && socketReady) {
+      socket.send(JSON.stringify({ author: "Captain", text }));
+    } else {
+      // 本地模式：直接回显
+      appendMessage("Captain (you)", text, "player");
+    }
   }
   closeChatInput();
 }
@@ -100,6 +140,7 @@ export function initChat() {
   });
 
   appendMessage("Harbormaster", "Welcome to the Sandsea, Captain. Markets are marked overhead.", "npc");
+  connectGlobalChat();
 
   // 环境闲聊：40-75 秒一条，顺序轮播不重复
   let chatterIndex = Math.floor(Math.random() * NPC_CHATTER.length);

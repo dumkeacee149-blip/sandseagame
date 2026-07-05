@@ -694,3 +694,93 @@ h1 {
     padding: 10px 14px;
   }
 }
+
+/* ---------- 触屏控制 ---------- */
+.touch-stick {
+  position: fixed;
+  left: 22px;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  border: 2px solid var(--brass-dim);
+  background: rgba(36, 23, 8, 0.45);
+  z-index: 15;
+  touch-action: none;
+}
+
+.touch-stick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: linear-gradient(178deg, var(--brass-bright), var(--brass));
+  border: 1px solid rgba(24, 14, 5, 0.85);
+  box-shadow: 0 3px 0 rgba(24, 14, 5, 0.6);
+  pointer-events: none;
+}
+
+.touch-button {
+  position: fixed;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 1px solid rgba(24, 14, 5, 0.85);
+  background: linear-gradient(178deg, var(--brass-bright), var(--brass) 60%, #a4762c);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1.4rem;
+  z-index: 15;
+  box-shadow: 0 4px 0 rgba(24, 14, 5, 0.6);
+  touch-action: none;
+}
+
+.touch-button:active {
+  translate: 0 2px;
+  box-shadow: 0 2px 0 rgba(24, 14, 5, 0.6);
+}
+
+.touch-button-action {
+  right: 26px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.touch-button-jump {
+  right: 104px;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+}
+
+/* 触屏模式下聊天上移让位给摇杆，操作提示隐藏 */
+.touch-mode .chat-panel {
+  bottom: 150px;
+  width: min(280px, 46vw);
+}
+
+.touch-mode .controls-hint {
+  display: none;
+}
+
+/* 窄屏：小地图缩小，铭牌让出右侧空间 */
+@media (max-width: 640px) {
+  .minimap {
+    width: 104px;
+    height: 104px;
+    top: 12px;
+    right: 12px;
+  }
+
+  .brand-strip {
+    max-width: calc(100vw - 132px);
+  }
+
+  .stat-chip {
+    padding: 4px 8px;
+  }
+
+  .stat-chip b {
+    font-size: 1.05rem;
+  }
+}

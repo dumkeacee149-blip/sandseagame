@@ -9,6 +9,8 @@ import {
   consumeDrag,
   clearFramePresses,
 } from "./core/input";
+import { initTouchControls } from "./core/touch";
+import { getStick } from "./core/input";
 import { hunyuanSlot } from "./core/models";
 import { mat } from "./core/materials";
 import { createTerrain } from "./world/sand";
@@ -58,13 +60,29 @@ if (!canvas) {
   throw new Error("Game canvas was not found.");
 }
 
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias: true,
-  alpha: false,
-  powerPreference: "high-performance",
-});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// WebGL 创建失败兜底：老设备/被禁用 WebGL 时给出明确提示而不是白屏
+function createRenderer(target: HTMLCanvasElement) {
+  try {
+    return new THREE.WebGLRenderer({
+      canvas: target,
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+  } catch (error) {
+    const overlay = document.querySelector("#boot-overlay");
+    if (overlay) {
+      overlay.innerHTML =
+        "<h2>Sandsea Privateers</h2><p style='animation:none;opacity:0.85'>Your browser does not support WebGL, which this game requires.<br/>Please try a recent version of Chrome, Edge, Firefox or Safari.</p>";
+    }
+    throw error;
+  }
+}
+
+const renderer = createRenderer(canvas);
+// 触屏设备用较低渲染分辨率（填充率是移动端瓶颈）
+const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarsePointer ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -276,6 +294,7 @@ function onResize() {
 window.addEventListener("resize", onResize);
 initInput();
 initMouse();
+initTouchControls();
 initMinimap();
 initQuests();
 initChat();
@@ -321,6 +340,7 @@ if (import.meta.env.DEV) {
     getPlayerY: () => playerState.position.y,
     getPlayerPos: () => ({ x: playerState.position.x, y: playerState.position.y, z: playerState.position.z }),
     getShipPos: () => ({ x: shipState.position.x, z: shipState.position.z }),
+    getStick,
     getState,
     setState,
     goAshore,
@@ -423,4 +443,19 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-renderer.setAnimationLoop(animate);
+// 首帧渲染完成后移除 Loading 覆盖层
+let bootOverlayRemoved = false;
+function removeBootOverlay() {
+  if (bootOverlayRemoved) return;
+  bootOverlayRemoved = true;
+  const overlay = document.querySelector<HTMLElement>("#boot-overlay");
+  if (overlay) {
+    overlay.style.opacity = "0";
+    setTimeout(() => overlay.remove(), 420);
+  }
+}
+
+renderer.setAnimationLoop(() => {
+  animate();
+  removeBootOverlay();
+});

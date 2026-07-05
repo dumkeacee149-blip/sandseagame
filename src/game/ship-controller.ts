@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { isDown } from "../core/input";
+import { isDown, getStick } from "../core/input";
 import { surfaceHeight, islandLift } from "../world/sand";
 import { SEA_OBSTACLES } from "../world/landmarks";
 import { sailSpeed } from "./data";
@@ -38,12 +38,15 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   const leftInput = Number(isDown("KeyA") || isDown("ArrowLeft"));
   const rightInput = Number(isDown("KeyD") || isDown("ArrowRight"));
 
-  const thrust = forwardInput - backInput * 0.62;
+  // 键盘与触屏摇杆合流（摇杆上推 y 为负 = 前进）
+  const stick = getStick();
+  const thrust = THREE.MathUtils.clamp(forwardInput - backInput * 0.62 - stick.y, -0.62, 1);
   // 最高速由帆等级决定（92/106/122/140）——L2 起正面跑赢沙虫(110)
   shipState.targetSpeed = thrust * sailSpeed(getState());
   shipState.speed = THREE.MathUtils.damp(shipState.speed, shipState.targetSpeed, 2.5, delta);
 
-  const turn = (leftInput - rightInput) * Math.max(Math.abs(shipState.speed), 28) * 0.0065;
+  const turnAxis = THREE.MathUtils.clamp(leftInput - rightInput - stick.x, -1, 1);
+  const turn = turnAxis * Math.max(Math.abs(shipState.speed), 28) * 0.0065;
   shipState.heading += turn * delta;
 
   const forward = tempVec.set(Math.sin(shipState.heading), 0, Math.cos(shipState.heading));

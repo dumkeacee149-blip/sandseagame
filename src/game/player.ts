@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { isDown, consumePressed } from "../core/input";
+import { isDown, consumePressed, getStick } from "../core/input";
 import { surfaceHeight } from "../world/sand";
 import { loadRiggedModel, fitRiggedToPlaceholder } from "../core/models";
 import { createVoxelAsset } from "../voxel-assets";
@@ -122,9 +122,11 @@ export function updatePlayer(
   const rightInput = Number(isDown("KeyD") || isDown("ArrowRight"));
   const sprinting = isDown("ShiftLeft") || isDown("ShiftRight");
 
-  playerState.heading += (leftInput - rightInput) * TURN_SPEED * delta;
+  const stick = getStick();
+  const turnAxis = THREE.MathUtils.clamp(leftInput - rightInput - stick.x, -1, 1);
+  playerState.heading += turnAxis * TURN_SPEED * delta;
 
-  const thrust = forwardInput - backInput * 0.7;
+  const thrust = THREE.MathUtils.clamp(forwardInput - backInput * 0.7 - stick.y, -0.7, 1);
   const targetSpeed = thrust * WALK_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1);
   playerState.speed = THREE.MathUtils.damp(playerState.speed, targetSpeed, 8, delta);
 

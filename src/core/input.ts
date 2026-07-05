@@ -26,6 +26,24 @@ export function isDown(code: string) {
   return keys.has(code);
 }
 
+// 虚拟摇杆轴（触屏）：x=转向 -1..1，y=油门 -1..1（上推为负，遵循屏幕坐标）
+let stickX = 0;
+let stickY = 0;
+
+export function setVirtualStick(x: number, y: number) {
+  stickX = x;
+  stickY = y;
+}
+
+export function getStick() {
+  return { x: stickX, y: stickY };
+}
+
+// 触控按钮注入按键（等效敲一下键盘）
+export function injectPress(code: string) {
+  pressed.add(code);
+}
+
 // 单次按键（边沿触发）：本帧内被消费一次即失效
 export function consumePressed(code: string) {
   const has = pressed.has(code);

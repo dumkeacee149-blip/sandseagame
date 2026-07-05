@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 体素沙艇小图标：沙底 + 木船身 + 红帆 -->
+  <rect width="32" height="32" rx="6" fill="#2b1d10"/>
+  <rect x="4" y="24" width="24" height="4" fill="#d9a65d"/>
+  <rect x="8" y="19" width="16" height="5" fill="#6e4026"/>
+  <rect x="10" y="17" width="12" height="2" fill="#3d2418"/>
+  <rect x="15" y="5" width="2" height="12" fill="#3d2418"/>
+  <path d="M17 5 L26 15 L17 15 Z" fill="#a72f32"/>
+  <rect x="11" y="14" width="3" height="3" fill="#52d0c6"/>
+</svg>

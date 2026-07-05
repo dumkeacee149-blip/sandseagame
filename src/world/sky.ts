@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { palette } from "../core/palette";
 import { basicMat } from "../core/materials";
 import { sandHeight } from "./sand";
@@ -55,59 +56,75 @@ export function createSunAndMoons() {
   return group;
 }
 
+// 云只随整体平移，个体不动：全部 puff 烘进一个几何体 = 1 次 draw call（原 150+）
 export function createCloudBank() {
-  const group = new THREE.Group();
   const cloudMaterial = basicMat("cloud", "#fff3d4", {
     transparent: true,
     opacity: 0.72,
     depthWrite: false,
   });
 
+  const puffGeometries: THREE.BufferGeometry[] = [];
+  const cloudMatrix = new THREE.Matrix4();
+  const puffMatrix = new THREE.Matrix4();
+
   for (let i = 0; i < 34; i += 1) {
-    const cloud = new THREE.Group();
-    const puffs = 3 + Math.floor(Math.random() * 4);
-    for (let j = 0; j < puffs; j += 1) {
-      const puff = new THREE.Mesh(
-        new THREE.BoxGeometry(64 + Math.random() * 56, 10, 40 + Math.random() * 26),
-        cloudMaterial,
-      );
-      puff.position.set(j * 52, Math.floor(Math.random() * 2) * 10, Math.random() * 26);
-      cloud.add(puff);
-    }
-    cloud.position.set(
+    cloudMatrix.makeRotationY(Math.random() * Math.PI);
+    cloudMatrix.setPosition(
       THREE.MathUtils.randFloatSpread(2500),
       THREE.MathUtils.randFloat(260, 460),
       THREE.MathUtils.randFloatSpread(2300),
     );
-    cloud.rotation.y = Math.random() * Math.PI;
-    group.add(cloud);
+    const puffs = 3 + Math.floor(Math.random() * 4);
+    for (let j = 0; j < puffs; j += 1) {
+      const geometry = new THREE.BoxGeometry(
+        64 + Math.random() * 56,
+        10,
+        40 + Math.random() * 26,
+      );
+      puffMatrix.makeTranslation(j * 52, Math.floor(Math.random() * 2) * 10, Math.random() * 26);
+      geometry.applyMatrix4(puffMatrix);
+      geometry.applyMatrix4(cloudMatrix);
+      puffGeometries.push(geometry);
+    }
   }
 
-  return group;
+  const merged = mergeGeometries(puffGeometries);
+  puffGeometries.forEach((geometry) => geometry.dispose());
+  const bank = new THREE.Group();
+  bank.add(new THREE.Mesh(merged, cloudMaterial));
+  return bank;
 }
 
+// 130 条静态沙纹 → 单个 LineSegments = 1 次 draw call
 export function createSandLines() {
-  const group = new THREE.Group();
   const lineMaterial = new THREE.LineBasicMaterial({
     color: "#fff0bd",
     transparent: true,
     opacity: 0.24,
   });
 
+  const positions: number[] = [];
+  const rotation = new THREE.Matrix4().makeRotationY(-0.28);
+  const point = new THREE.Vector3();
+
   for (let i = 0; i < 130; i += 1) {
-    const points: THREE.Vector3[] = [];
     const baseX = THREE.MathUtils.randFloatSpread(3000);
     const baseZ = THREE.MathUtils.randFloatSpread(3000);
+    let prev: [number, number, number] | null = null;
     for (let j = 0; j < 7; j += 1) {
       const x = baseX + j * 24;
       const z = baseZ + Math.sin(j * 0.8 + i) * 8;
-      points.push(new THREE.Vector3(x, sandHeight(x, z) + 1.4, z));
+      point.set(x, sandHeight(x, z) + 1.4, z).applyMatrix4(rotation);
+      if (prev) positions.push(...prev, point.x, point.y, point.z);
+      prev = [point.x, point.y, point.z];
     }
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lineMaterial);
-    line.rotation.y = -0.28;
-    group.add(line);
   }
 
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const group = new THREE.Group();
+  group.add(new THREE.LineSegments(geometry, lineMaterial));
   return group;
 }
 
