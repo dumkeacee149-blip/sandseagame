@@ -8,8 +8,9 @@ const canvasElement = document.querySelector<HTMLCanvasElement>("#asset-canvas")
 const titleElement = document.querySelector<HTMLElement>("#asset-title");
 const roleElement = document.querySelector<HTMLElement>("#asset-role");
 const tabsElement = document.querySelector<HTMLElement>("#asset-tabs");
+const clipTabsElement = document.querySelector<HTMLElement>("#clip-tabs");
 
-if (!canvasElement || !titleElement || !roleElement || !tabsElement) {
+if (!canvasElement || !titleElement || !roleElement || !tabsElement || !clipTabsElement) {
   throw new Error("Asset viewer DOM is incomplete.");
 }
 
@@ -17,6 +18,7 @@ const canvas = canvasElement;
 const title = titleElement;
 const role = roleElement;
 const tabs = tabsElement;
+const clipTabs = clipTabsElement;
 
 const query = new URLSearchParams(window.location.search);
 const sheetMode = query.get("sheet") === "1";
@@ -33,6 +35,7 @@ const hunyuanAssetPaths = {
   A08: "/assets/hunyuan/raw/A08_hunyuan_relic_chest_v1.glb",
   A09: "/assets/hunyuan/raw/A09_hunyuan_harpoon_cannon_v1.glb",
   A10: "/assets/hunyuan/raw/A10_hunyuan_caravan_cart_v1.glb",
+  H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb",
 } as const;
 let selectedIndex = Math.max(
   0,
@@ -94,6 +97,19 @@ let narrowSheet = window.innerWidth < 760;
 let compareReady = false;
 const gltfLoader = new GLTFLoader();
 
+type AnimationPlayer = {
+  mixer: THREE.AnimationMixer;
+  clips: THREE.AnimationClip[];
+  activeIndex: number;
+  elapsed: number;
+  action: THREE.AnimationAction | null;
+  lockedClipIndex: number | null;
+};
+
+const animationPlayers: AnimationPlayer[] = [];
+let focusedAnimationPlayer: AnimationPlayer | null = null;
+let elapsedTime = 0;
+
 const stageMaterials = {
   sand: new THREE.MeshLambertMaterial({ color: "#d9a65d", flatShading: true }),
   sandLight: new THREE.MeshLambertMaterial({ color: "#efd08c", flatShading: true }),
@@ -115,11 +131,71 @@ function makeStageBox(
 }
 
 function clearStage() {
+  animationPlayers.length = 0;
+  focusedAnimationPlayer = null;
+  rebuildClipTabs(null);
   while (stage.children.length > 0) {
     const child = stage.children.pop();
     if (child) stage.remove(child);
   }
   activeAsset = null;
+}
+
+function startClip(player: AnimationPlayer, index: number) {
+  const nextClip = player.clips[index];
+  if (!nextClip) return;
+
+  if (player.action) {
+    player.action.stop();
+  }
+  player.action = player.mixer.clipAction(nextClip);
+  player.action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+  player.activeIndex = index;
+  player.elapsed = 0;
+  if (player === focusedAnimationPlayer) {
+    updateClipTabsState();
+  }
+}
+
+function setClipLock(player: AnimationPlayer, clipIndex: number | null) {
+  player.lockedClipIndex = clipIndex;
+  startClip(player, clipIndex ?? 0);
+  updateClipTabsState();
+}
+
+function updateClipTabsState() {
+  const player = focusedAnimationPlayer;
+  const buttons = clipTabs.querySelectorAll<HTMLButtonElement>(".clip-tab");
+  buttons.forEach((button) => {
+    const clipIndex = button.dataset.clipIndex === "auto" ? null : Number(button.dataset.clipIndex);
+    const active =
+      player &&
+      ((clipIndex === null && player.lockedClipIndex === null) ||
+        (clipIndex !== null && player.lockedClipIndex === clipIndex));
+    button.setAttribute("aria-current", active ? "true" : "false");
+  });
+}
+
+function rebuildClipTabs(player: AnimationPlayer | null) {
+  clipTabs.replaceChildren();
+  focusedAnimationPlayer = player;
+  clipTabs.hidden = !player || sheetMode || compareMode;
+  if (!player || clipTabs.hidden) return;
+
+  const buttons = [
+    { label: "Auto", index: null },
+    ...player.clips.map((clip, index) => ({ label: clip.name, index })),
+  ];
+  buttons.forEach(({ label, index }) => {
+    const button = document.createElement("button");
+    button.className = "clip-tab";
+    button.type = "button";
+    button.textContent = label;
+    button.dataset.clipIndex = index === null ? "auto" : String(index);
+    button.addEventListener("click", () => setClipLock(player, index));
+    clipTabs.append(button);
+  });
+  updateClipTabsState();
 }
 
 function fitAsset(asset: THREE.Group, targetExtent: number) {
@@ -154,6 +230,24 @@ async function loadHunyuanAsset(path: string, id: string) {
       });
     }
   });
+  if (gltf.animations.length > 0) {
+    const preferredClipNames = ["Idle", "Walk", "Run", "Attack"];
+    const preferredClips = preferredClipNames
+      .map((name) => gltf.animations.find((clip) => clip.name === name))
+      .filter((clip): clip is THREE.AnimationClip => Boolean(clip));
+    const remainingClips = gltf.animations.filter((clip) => !preferredClipNames.includes(clip.name));
+    const player: AnimationPlayer = {
+      mixer: new THREE.AnimationMixer(gltf.scene),
+      clips: [...preferredClips, ...remainingClips],
+      activeIndex: 0,
+      elapsed: 0,
+      action: null,
+      lockedClipIndex: null,
+    };
+    startClip(player, 0);
+    asset.userData.animationPlayer = player;
+    animationPlayers.push(player);
+  }
   return asset;
 }
 
@@ -252,7 +346,7 @@ function updateHeader(index: number) {
   }
 
   if (sheetMode) {
-    title.textContent = preferHunyuanAssets ? "混元候选 + 方块备份资产板" : "A01-A10 方块体素资产板";
+    title.textContent = preferHunyuanAssets ? "混元候选 + 方块备份资产板" : "A/H 方块体素资产板";
     role.textContent = preferHunyuanAssets
       ? "Available Hunyuan GLBs are used first; missing assets fall back to local voxel baselines"
       : "Minecraft-like pixel/block baseline for approval";
@@ -295,8 +389,13 @@ function rebuildTabs() {
 }
 
 function setFocusCamera() {
-  camera.position.set(6.2, 4.7, 8.2);
-  controls.target.set(0, 1.85, 0);
+  if (window.innerWidth < 760) {
+    camera.position.set(5.8, 4.2, 10.4);
+    controls.target.set(0, 1.55, 0);
+  } else {
+    camera.position.set(6.2, 4.7, 8.2);
+    controls.target.set(0, 1.85, 0);
+  }
   controls.minDistance = 4.2;
   controls.maxDistance = 16;
   controls.update();
@@ -334,10 +433,11 @@ async function showAsset(index: number) {
   rebuildTabs();
 
   const asset = await createPreferredAsset(index);
-  fitAsset(asset, 5.2);
+  fitAsset(asset, window.innerWidth < 760 ? 4.25 : 5.2);
   asset.position.y += 0.1;
   activeAsset = asset;
   stage.add(asset);
+  rebuildClipTabs((asset.userData.animationPlayer as AnimationPlayer | undefined) ?? null);
 
   setFocusCamera();
 }
@@ -454,9 +554,19 @@ if (compareMode) {
 }
 
 function animate() {
-  const elapsed = clock.getElapsedTime();
+  const delta = clock.getDelta();
+  elapsedTime += delta;
+  for (const player of animationPlayers) {
+    player.mixer.update(delta);
+    player.elapsed += delta;
+    const activeClip = player.clips[player.activeIndex];
+    const holdSeconds = Math.max(activeClip?.duration ?? 0, 1.8) + 0.45;
+    if (player.lockedClipIndex === null && player.clips.length > 1 && player.elapsed > holdSeconds) {
+      startClip(player, (player.activeIndex + 1) % player.clips.length);
+    }
+  }
   if (activeAsset) {
-    activeAsset.position.y = 0.3 + Math.sin(elapsed * 1.3) * 0.035;
+    activeAsset.position.y = 0.3 + Math.sin(elapsedTime * 1.3) * 0.035;
   }
   controls.update();
   renderer.render(scene, camera);

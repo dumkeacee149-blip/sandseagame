@@ -40,6 +40,7 @@ import {
 } from "./game/player";
 import { updateHud } from "./ui/hud";
 import { initQuests } from "./ui/quests";
+import { initChat, postChat, isChatOpen } from "./ui/chat";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
 import { showModal, isModalOpen } from "./ui/modal";
@@ -221,6 +222,7 @@ function strand() {
   shipState.targetSpeed = 0;
   mode = "sailing";
   player.visible = false;
+  postChat("Harbormaster", `Fished you out of the dunes. Towing fee ${STRAND_TOW_FEE}g, Captain.`);
   showModal({
     eyebrow: "Shipwreck",
     title: "Stranded in the Sandsea",
@@ -276,6 +278,7 @@ initInput();
 initMouse();
 initMinimap();
 initQuests();
+initChat();
 
 // 鼠标拖拽旋转镜头（yaw 环绕 / pitch 俯仰），航行与步行共用
 const cameraOrbit = { yaw: 0, pitch: 0 };
@@ -345,6 +348,7 @@ function animate() {
   if (bitten) {
     const remaining = getState().hull;
     showToast(`Leviathan bite! Hull ${remaining}`);
+    postChat("Lookout", `Leviathan strike! Hull at ${remaining}.`);
     if (remaining <= 0) strand();
   }
 
@@ -382,6 +386,7 @@ function animate() {
     );
     if (nearTreasure && consumePressed("KeyE")) {
       setState(openTreasure(state));
+      postChat("Harbormaster", "Word spreads fast — the relic vault stands open. A legend walks among us!");
       showModal({
         eyebrow: "Legend Fulfilled",
         title: "The Relic Chest Opens!",

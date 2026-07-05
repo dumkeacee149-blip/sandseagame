@@ -72,13 +72,18 @@ body {
   font-size: clamp(0.84rem, 1.5vw, 0.98rem);
 }
 
-.asset-tabs {
+.review-controls {
   pointer-events: auto;
   align-self: center;
   display: grid;
-  grid-template-columns: repeat(10, minmax(42px, 1fr));
   gap: 8px;
-  width: min(760px, calc(100vw - 28px));
+  width: min(840px, calc(100vw - 28px));
+}
+
+.asset-tabs,
+.clip-tabs {
+  display: grid;
+  gap: 8px;
   padding: 8px;
   border: 1px solid rgba(246, 235, 208, 0.15);
   background: rgba(20, 17, 22, 0.72);
@@ -86,7 +91,20 @@ body {
   backdrop-filter: blur(12px);
 }
 
-.asset-tab {
+.asset-tabs {
+  grid-template-columns: repeat(10, minmax(42px, 1fr));
+}
+
+.clip-tabs {
+  grid-template-columns: repeat(5, minmax(56px, 1fr));
+}
+
+.clip-tabs[hidden] {
+  display: none;
+}
+
+.asset-tab,
+.clip-tab {
   appearance: none;
   min-width: 0;
   height: 42px;
@@ -100,12 +118,19 @@ body {
   cursor: pointer;
 }
 
-.asset-tab:hover {
+.clip-tab {
+  height: 36px;
+  font-size: 0.74rem;
+}
+
+.asset-tab:hover,
+.clip-tab:hover {
   border-color: rgba(94, 230, 213, 0.55);
   background: rgba(39, 64, 67, 0.64);
 }
 
-.asset-tab[aria-current="true"] {
+.asset-tab[aria-current="true"],
+.clip-tab[aria-current="true"] {
   border-color: #5ee6d5;
   background: #284f55;
   color: #ffffff;
@@ -120,7 +145,15 @@ body {
     padding: 12px;
   }
 
+  .review-controls {
+    width: min(520px, calc(100vw - 24px));
+  }
+
   .asset-tabs {
     grid-template-columns: repeat(5, minmax(42px, 1fr));
+  }
+
+  .clip-tabs {
+    grid-template-columns: repeat(5, minmax(46px, 1fr));
   }
 }

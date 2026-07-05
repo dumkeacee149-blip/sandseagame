@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GameState } from "../game/data";
-import { cargoCapacity, cargoCount, PORTS, TREASURE_X, TREASURE_Z } from "../game/data";
+import { cargoCapacity, cargoCount, maxHull, PORTS, TREASURE_X, TREASURE_Z } from "../game/data";
 
 // 方位角转罗盘文字（世界 +z 为北）
 function bearingLabel(dx: number, dz: number) {
@@ -15,6 +15,7 @@ const speedEl = document.querySelector("#speed");
 const goldEl = document.querySelector("#gold");
 const cargoEl = document.querySelector("#cargo");
 const hullEl = document.querySelector("#hull");
+const hullChipEl = hullEl?.closest(".stat-hull") ?? null;
 const routeEl = document.querySelector("#route");
 
 const portProbe = new THREE.Vector3();
@@ -24,6 +25,8 @@ export function updateHud(state: GameState, shipSpeed: number, shipPosition: THR
   if (goldEl) goldEl.textContent = state.gold.toString();
   if (cargoEl) cargoEl.textContent = `${cargoCount(state)}/${cargoCapacity(state)}`;
   if (hullEl) hullEl.textContent = state.hull.toString();
+  // 耐久低于 40% 红色脉冲告警
+  if (hullChipEl) hullChipEl.classList.toggle("hull-low", state.hull < maxHull(state) * 0.4);
 
   if (routeEl) {
     // 买了藏宝图且未通关：导航条变成宝藏罗盘（不画图，一行字就是罗盘）

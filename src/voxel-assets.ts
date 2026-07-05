@@ -10,7 +10,8 @@ export type VoxelAssetId =
   | "A07"
   | "A08"
   | "A09"
-  | "A10";
+  | "A10"
+  | "H01";
 
 export type VoxelAssetDefinition = {
   id: VoxelAssetId;
@@ -380,6 +381,13 @@ function createCaravanSandCart() {
   return finishAsset("A10", group);
 }
 
+function createRiggedHeroFallback() {
+  const group = createDesertPrivateerHero();
+  group.name = "rigged-privateer-fallback";
+  group.userData.assetId = "H01";
+  return group;
+}
+
 export const ASSET_DEFINITIONS: VoxelAssetDefinition[] = [
   {
     id: "A01",
@@ -450,6 +458,13 @@ export const ASSET_DEFINITIONS: VoxelAssetDefinition[] = [
     zhName: "商队沙车",
     role: "Trader transport prop",
     create: createCaravanSandCart,
+  },
+  {
+    id: "H01",
+    name: "Rigged Sandsea Privateer",
+    zhName: "绑骨沙海私掠者",
+    role: "Player avatar rig with gameplay animation clips",
+    create: createRiggedHeroFallback,
   },
 ];
 

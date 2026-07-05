@@ -1,9 +1,21 @@
 // 输入状态收口：键盘与未来的虚拟摇杆都写到这里，也是测试注入的接缝
 const keys = new Set<string>();
 const pressed = new Set<string>();
+let captured = false;
+
+// 聊天输入框等 UI 占用键盘时，游戏输入全部静默
+export function setKeyCapture(on: boolean) {
+  captured = on;
+  if (on) keys.clear();
+}
+
+export function isKeyCaptured() {
+  return captured;
+}
 
 export function initInput() {
   window.addEventListener("keydown", (event) => {
+    if (captured) return;
     if (!event.repeat) pressed.add(event.code);
     keys.add(event.code);
   });

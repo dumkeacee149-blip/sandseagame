@@ -7,26 +7,32 @@
   </head>
   <body>
     <canvas id="game"></canvas>
-    <main class="hud" aria-label="Sandsea privateers prototype status">
+    <main class="hud" aria-label="Sandsea privateers status">
       <section class="brand-strip">
-        <div>
+        <div class="brand-title">
           <p class="eyebrow">Sandsea Privateers</p>
           <h1>Dune Corsair</h1>
         </div>
         <div class="stat-grid">
-          <span><b id="speed">0</b> knots</span>
-          <span><b id="gold">0</b> gold</span>
-          <span><b id="cargo">0/8</b> cargo</span>
-          <span><b id="hull">100</b> hull</span>
+          <span class="stat-chip"><i>⛵</i><b id="speed">0</b><em>knots</em></span>
+          <span class="stat-chip stat-gold"><i>🪙</i><b id="gold">0</b><em>gold</em></span>
+          <span class="stat-chip"><i>📦</i><b id="cargo">0/8</b><em>cargo</em></span>
+          <span class="stat-chip stat-hull"><i>♥</i><b id="hull">100</b><em>hull</em></span>
         </div>
       </section>
       <section class="route-chip">
         <span class="route-dot"></span>
-        <span id="route">Oasis Port / Sunken Gate / Glass Dunes</span>
+        <span id="route">Open Sandsea</span>
       </section>
     </main>
     <div id="action" class="action-chip" role="status"></div>
     <canvas id="minimap" class="minimap" width="150" height="150" aria-label="Minimap"></canvas>
+    <div id="chat" class="chat-panel">
+      <p class="chat-badge">⚓ Harbor Band · <span class="chat-local">LOCAL</span></p>
+      <ul id="chat-log"></ul>
+      <input id="chat-input" maxlength="120" placeholder="Say something, Captain… (Enter)" hidden autocomplete="off" />
+    </div>
+    <div class="controls-hint">WASD move · E interact · Space jump · Click attack · Drag rotate · Enter chat</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
