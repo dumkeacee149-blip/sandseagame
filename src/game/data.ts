@@ -116,6 +116,8 @@ export interface GameState {
   // 藏宝图与通关标记
   readonly mapPurchased: boolean;
   readonly completed: boolean;
+  // 累计成交笔数（买+卖各算一笔）：任务链的进度依据
+  readonly trades: number;
 }
 
 export const TREASURE_MAP_COST = 1500;
@@ -142,6 +144,7 @@ export function createInitialState(): GameState {
     lastPort: "oasis",
     mapPurchased: false,
     completed: false,
+    trades: 0,
   };
 }
 

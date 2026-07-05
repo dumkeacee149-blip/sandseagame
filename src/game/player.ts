@@ -120,11 +120,17 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   }
 }
 
-export function updateWalkCamera(camera: THREE.PerspectiveCamera, avatar: THREE.Object3D, delta: number) {
+export function updateWalkCamera(
+  camera: THREE.PerspectiveCamera,
+  avatar: THREE.Object3D,
+  delta: number,
+  orbit: { yaw: number; pitch: number },
+) {
+  const angle = playerState.heading + orbit.yaw;
   const back = new THREE.Vector3(
-    -Math.sin(playerState.heading) * 72,
-    38,
-    -Math.cos(playerState.heading) * 72,
+    -Math.sin(angle) * 72,
+    38 + orbit.pitch * 100,
+    -Math.cos(angle) * 72,
   );
   const desired = avatar.position.clone().add(back);
   camera.position.lerp(desired, 1 - Math.exp(-delta * 4.5));

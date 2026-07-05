@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import "./styles.css";
 import { palette } from "./core/palette";
-import { initInput, initMouse, consumePressed, consumeClick, clearFramePresses } from "./core/input";
+import {
+  initInput,
+  initMouse,
+  consumePressed,
+  consumeClick,
+  consumeDrag,
+  clearFramePresses,
+} from "./core/input";
 import { hunyuanSlot } from "./core/models";
 import { mat } from "./core/materials";
 import { createTerrain } from "./world/sand";
@@ -22,6 +29,7 @@ import {
   breakableCrates,
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
+import { createMarketMarkers, updateMarkers } from "./world/markers";
 import { shipState, updateShip, updateCamera } from "./game/ship-controller";
 import {
   playerState,
@@ -31,6 +39,7 @@ import {
   startAttack,
 } from "./game/player";
 import { updateHud } from "./ui/hud";
+import { initQuests } from "./ui/quests";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
 import { showModal, isModalOpen } from "./ui/modal";
@@ -104,6 +113,7 @@ scene.add(createRuins());
 scene.add(createSaltFlats());
 scene.add(createSaltcrestCamp());
 scene.add(createSeaScatter());
+scene.add(createMarketMarkers());
 const worm = createWorm();
 scene.add(worm);
 scene.add(createDistantCaravans());
@@ -265,6 +275,16 @@ window.addEventListener("resize", onResize);
 initInput();
 initMouse();
 initMinimap();
+initQuests();
+
+// 鼠标拖拽旋转镜头（yaw 环绕 / pitch 俯仰），航行与步行共用
+const cameraOrbit = { yaw: 0, pitch: 0 };
+
+function updateCameraOrbit() {
+  const drag = consumeDrag();
+  cameraOrbit.yaw -= drag.dx * 0.006;
+  cameraOrbit.pitch = THREE.MathUtils.clamp(cameraOrbit.pitch + drag.dy * 0.004, -0.18, 0.6);
+}
 
 // 存档：启动恢复，之后每次状态变更（交易/劈箱等离散事件）自动写入
 const savedGame = load();
@@ -330,17 +350,19 @@ function animate() {
 
   if (mode === "sailing") {
     updateShip(ship, delta, elapsed);
-    updateCamera(camera, ship, delta);
+    updateCameraOrbit();
+    updateCamera(camera, ship, delta, cameraOrbit);
     const canGoAshore = Math.abs(shipState.speed) < 8;
     setAction(canGoAshore ? "Press E to go ashore" : null);
     if (canGoAshore && consumePressed("KeyE")) goAshore();
   } else if (isTradePanelOpen()) {
     // 交易中：世界暂停接收输入，E/Esc 离开集市
-    updateWalkCamera(camera, player, delta);
+    updateWalkCamera(camera, player, delta, cameraOrbit);
     if (consumePressed("KeyE") || consumePressed("Escape")) closeTradePanel();
   } else {
     updatePlayer(player, delta, elapsed);
-    updateWalkCamera(camera, player, delta);
+    updateCameraOrbit();
+    updateWalkCamera(camera, player, delta, cameraOrbit);
     if (consumeClick() && startAttack()) tryBreakCrates();
     const market = findNearbyMarket();
     const nearShip = player.position.distanceTo(ship.position) < 60;
@@ -383,6 +405,7 @@ function animate() {
 
   updateSplinters(delta);
   updateWorm(worm, elapsed);
+  updateMarkers(elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;

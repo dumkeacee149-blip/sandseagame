@@ -65,13 +65,21 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   ship.rotation.x = Math.sin(elapsed * 2.6) * 0.025 + shipState.speed * 0.0007;
 }
 
-export function updateCamera(camera: THREE.PerspectiveCamera, ship: THREE.Object3D, delta: number) {
+export type CameraOrbit = { yaw: number; pitch: number };
+
+export function updateCamera(
+  camera: THREE.PerspectiveCamera,
+  ship: THREE.Object3D,
+  delta: number,
+  orbit: CameraOrbit,
+) {
+  const angle = shipState.heading + orbit.yaw;
   const back = new THREE.Vector3(
-    -Math.sin(shipState.heading) * 165,
-    58,
-    -Math.cos(shipState.heading) * 165,
+    -Math.sin(angle) * 165,
+    58 + orbit.pitch * 190,
+    -Math.cos(angle) * 165,
   );
-  const side = new THREE.Vector3(Math.cos(shipState.heading), 0, -Math.sin(shipState.heading)).multiplyScalar(28);
+  const side = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle)).multiplyScalar(28);
   const desired = ship.position.clone().add(back).add(side);
   camera.position.lerp(desired, 1 - Math.exp(-delta * 3.8));
   camera.lookAt(ship.position.x, ship.position.y + 46, ship.position.z);

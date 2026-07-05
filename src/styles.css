@@ -328,3 +328,75 @@ h1 {
 .toast.visible {
   opacity: 1;
 }
+
+.quest-panel {
+  position: fixed;
+  left: 18px;
+  top: 46%;
+  transform: translateY(-50%);
+  width: 230px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 233, 184, 0.22);
+  background: rgba(22, 16, 11, 0.72);
+  color: #f8edd6;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.quest-title {
+  margin: 0 0 8px;
+  color: #7ce8d8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quest-panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quest-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.quest-mark {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.quest-done {
+  color: rgba(248, 237, 214, 0.45);
+  text-decoration: line-through;
+}
+
+.quest-done .quest-mark {
+  color: #5df08d;
+  text-decoration: none;
+}
+
+.quest-active .quest-mark {
+  color: #ffd678;
+}
+
+.quest-complete {
+  margin: 8px 0 0;
+  color: #ffd678;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .quest-panel {
+    display: none;
+  }
+}

@@ -45,6 +45,7 @@ export function buyGood(state: GameState, portId: PortId, good: GoodId, qty: num
     ...state,
     gold: state.gold - cost,
     cargo: { ...state.cargo, [good]: state.cargo[good] + qty },
+    trades: state.trades + 1,
   };
 }
 
@@ -56,6 +57,7 @@ export function sellGood(state: GameState, portId: PortId, good: GoodId, qty: nu
     ...state,
     gold: state.gold + price * qty,
     cargo: { ...state.cargo, [good]: state.cargo[good] - qty },
+    trades: state.trades + 1,
   };
 }
 
