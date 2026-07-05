@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { isDown, consumePressed } from "../core/input";
 import { worldHeight } from "../world/sand";
-import { loadRiggedModel, fitToPlaceholder } from "../core/models";
+import { hunyuanSlot } from "../core/models";
 import { createVoxelAsset } from "../voxel-assets";
 
 export type PlayerState = {
@@ -32,47 +32,14 @@ const ATTACK_DURATION = 0.32;
 const tempVec = new THREE.Vector3();
 let slashPivot: THREE.Group | null = null;
 
-// 骨骼动画：加载完成后接管姿态，占位/加载失败时回退程序化起伏
-let mixer: THREE.AnimationMixer | null = null;
-const actions: Record<string, THREE.AnimationAction> = {};
-let currentAction = "";
-
-function playAction(name: string, fade = 0.18) {
-  if (!mixer || currentAction === name) return;
-  const next = actions[name];
-  if (!next) return;
-  const prev = actions[currentAction];
-  next.reset().fadeIn(fade).play();
-  if (prev) prev.fadeOut(fade);
-  currentAction = name;
-}
-
+// 骨骼版 H01 等混元重新生成后接回：届时用 core/models 的 loadRiggedModel +
+// AnimationMixer 状态机（见 git e400f08 的 player.ts 实现），当前为混元静态模型
 export function createPlayerAvatar() {
   const rig = new THREE.Group();
 
   const placeholder = createVoxelAsset("A02");
   placeholder.scale.setScalar(4.2);
-  rig.add(placeholder);
-
-  loadRiggedModel("/models/hero_rigged.glb")
-    .then(({ scene: model, animations }) => {
-      fitToPlaceholder(model, placeholder);
-      rig.remove(placeholder);
-      rig.add(model);
-      mixer = new THREE.AnimationMixer(model);
-      for (const clip of animations) {
-        actions[clip.name] = mixer.clipAction(clip);
-      }
-      if (actions.Attack) {
-        actions.Attack.setLoop(THREE.LoopOnce, 1);
-        // Attack clip 长 1s，压到游戏内 0.32s 的出手节奏
-        actions.Attack.timeScale = 3;
-      }
-      playAction("Idle");
-    })
-    .catch((error) => {
-      console.error("骨骼主角加载失败，保留体素占位", error);
-    });
+  rig.add(hunyuanSlot(placeholder, "/models/hero.glb"));
 
   // 挥刀轨迹：攻击时绕玩家扫过的发光刀光
   slashPivot = new THREE.Group();
@@ -132,13 +99,7 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   playerState.position.y = nextY;
 
   avatar.position.copy(playerState.position);
-  if (mixer) {
-    // 骨骼动画状态机：攻击 > 跑 > 走 > 待机
-    mixer.update(delta);
-    if (playerState.attackTimer > 0) playAction("Attack", 0.06);
-    else if (Math.abs(playerState.speed) > 2) playAction(sprinting ? "Run" : "Walk");
-    else playAction("Idle");
-  } else if (playerState.grounded && Math.abs(playerState.speed) > 2) {
+  if (playerState.grounded && Math.abs(playerState.speed) > 2) {
     const bobSpeed = sprinting ? 12 : 9;
     avatar.position.y += Math.abs(Math.sin(elapsed * bobSpeed)) * 1.1;
   }

@@ -302,7 +302,7 @@ function animate() {
   clearFramePresses();
 
   updateSplinters(delta);
-  updateWorm(worm, elapsed, delta);
+  updateWorm(worm, elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
