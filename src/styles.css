@@ -271,3 +271,60 @@ h1 {
   color: rgba(248, 237, 214, 0.5);
   font-size: 0.78rem;
 }
+
+.trade-section {
+  margin: 14px 0 2px;
+}
+
+.trade-upgrade {
+  grid-column: 2 / 4;
+  justify-self: end;
+}
+
+.game-modal {
+  text-align: center;
+  z-index: 30;
+}
+
+.modal-title {
+  margin: 4px 0 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.modal-line {
+  margin: 8px 0;
+  color: rgba(248, 237, 214, 0.85);
+}
+
+.modal-button {
+  margin-top: 14px;
+  padding: 10px 26px;
+  border: 1px solid rgba(124, 232, 216, 0.4);
+  border-radius: 10px;
+  background: rgba(124, 232, 216, 0.16);
+  color: #cdf6ee;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 58, 46, 0.5);
+  background: rgba(60, 14, 10, 0.85);
+  color: #ffd9d0;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.toast.visible {
+  opacity: 1;
+}

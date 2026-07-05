@@ -111,7 +111,19 @@ export interface GameState {
   readonly hull: number;
   readonly upgrades: UpgradeLevels;
   readonly docking: DockingStatus;
+  // 最后交易过的港口：搁浅重生点
+  readonly lastPort: PortId;
+  // 藏宝图与通关标记
+  readonly mapPurchased: boolean;
+  readonly completed: boolean;
 }
+
+export const TREASURE_MAP_COST = 1500;
+export const TREASURE_REWARD = 5000;
+// 宝箱世界坐标（遗迹岛上的 A08）
+export const TREASURE_X = 702;
+export const TREASURE_Z = 314;
+export const STRAND_TOW_FEE = 25;
 
 export const EMPTY_CARGO: Readonly<Record<GoodId, number>> = {
   dates: 0,
@@ -127,6 +139,9 @@ export function createInitialState(): GameState {
     hull: UPGRADES.hull[0].value,
     upgrades: { sail: 0, cargo: 0, hull: 0 },
     docking: { kind: "sailing" },
+    lastPort: "oasis",
+    mapPurchased: false,
+    completed: false,
   };
 }
 

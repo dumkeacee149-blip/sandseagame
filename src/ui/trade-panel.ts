@@ -1,7 +1,13 @@
-import type { GameState, GoodId, PortId } from "../game/data";
-import { GOODS, cargoCapacity, cargoCount } from "../game/data";
-import { findPort, buyGood, sellGood } from "../game/economy";
+import type { GameState, GoodId, PortId, UpgradeId } from "../game/data";
+import { GOODS, UPGRADES, TREASURE_MAP_COST, cargoCapacity, cargoCount } from "../game/data";
+import { findPort, buyGood, sellGood, buyUpgrade, buyTreasureMap } from "../game/economy";
 import { getState, setState, subscribe } from "../game/store";
+
+const UPGRADE_LABELS: Record<UpgradeId, { name: string; unit: string }> = {
+  sail: { name: "Sail", unit: "speed" },
+  cargo: { name: "Cargo Hold", unit: "slots" },
+  hull: { name: "Hull", unit: "HP" },
+};
 
 let panelEl: HTMLDivElement | null = null;
 let currentPort: PortId | null = null;
@@ -37,6 +43,14 @@ function ensurePanel() {
     const action = button.dataset.action;
     if (action === "close") {
       closeTradePanel();
+      return;
+    }
+    if (action === "upgrade") {
+      setState(buyUpgrade(getState(), button.dataset.upgrade as UpgradeId));
+      return;
+    }
+    if (action === "treasure-map") {
+      setState(buyTreasureMap(getState()));
       return;
     }
     const good = button.dataset.good as GoodId;
@@ -91,6 +105,39 @@ function render(state: GameState) {
       </div>`;
   }).join("");
 
+  const upgradeRows = (Object.keys(UPGRADE_LABELS) as UpgradeId[])
+    .map((id) => {
+      const label = UPGRADE_LABELS[id];
+      const level = state.upgrades[id];
+      const tiers = UPGRADES[id];
+      const current = tiers[level];
+      const next = tiers[level + 1];
+      const action = next
+        ? `<button data-action="upgrade" data-upgrade="${id}" ${state.gold >= next.cost ? "" : "disabled"}>L${level + 1} · ${next.value} ${label.unit} · ${next.cost}g</button>`
+        : `<span class="trade-na">MAX</span>`;
+      return `
+      <div class="trade-row">
+        <div class="trade-good"><b>${label.name}</b><span>L${level} · ${current.value} ${label.unit}</span></div>
+        <div class="trade-actions trade-upgrade">${action}</div>
+      </div>`;
+    })
+    .join("");
+
+  // 藏宝图只在危险远港 Duneskull 出售（主题自洽：越险的地方越接近传说）
+  const treasureRow =
+    port.id === "duneskull" && !state.completed
+      ? `
+      <p class="trade-eyebrow trade-section">Rumors</p>
+      <div class="trade-row">
+        <div class="trade-good"><b>Treasure Map</b><span>${state.mapPurchased ? "purchased — head to the Sunken Ruins" : "leads to the relic vault"}</span></div>
+        <div class="trade-actions trade-upgrade">${
+          state.mapPurchased
+            ? `<span class="trade-na">OWNED</span>`
+            : `<button data-action="treasure-map" ${state.gold >= TREASURE_MAP_COST ? "" : "disabled"}>Buy · ${TREASURE_MAP_COST}g</button>`
+        }</div>
+      </div>`
+      : "";
+
   panelEl.innerHTML = `
     <div class="trade-head">
       <div>
@@ -100,5 +147,8 @@ function render(state: GameState) {
       <button data-action="close" class="trade-close" aria-label="Close">✕</button>
     </div>
     ${rows}
+    <p class="trade-eyebrow trade-section">Shipwright Upgrades</p>
+    ${upgradeRows}
+    ${treasureRow}
     <p class="trade-hint">E / Esc to leave</p>`;
 }

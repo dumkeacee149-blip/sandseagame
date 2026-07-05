@@ -33,10 +33,13 @@ import {
 import { updateHud } from "./ui/hud";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
+import { showModal, isModalOpen } from "./ui/modal";
 import { getState, setState, subscribe, resetState } from "./game/store";
-import { addGold } from "./game/economy";
+import * as economy from "./game/economy";
+import { addGold, applyStranding, recordVisit, openTreasure, findPort } from "./game/economy";
+import { updateWormAi, wormAi } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
-import { PORTS } from "./game/data";
+import { PORTS, TREASURE_X, TREASURE_Z, TREASURE_REWARD, STRAND_TOW_FEE } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -184,9 +187,46 @@ function updateSplinters(delta: number) {
   }
 }
 
+// 受击提示（红色 toast，1.6s 自动消失）
+const toastEl = document.createElement("div");
+toastEl.className = "toast";
+document.body.appendChild(toastEl);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(text: string) {
+  toastEl.textContent = text;
+  toastEl.classList.add("visible");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("visible"), 1600);
+}
+
+// 搁浅：结算惩罚 → 弹窗 → 在最后交易港重生
+function strand() {
+  const before = getState();
+  setState(applyStranding(before));
+  const port = findPort(before.lastPort);
+  shipState.position.set(port.x, 0, port.z + 280);
+  shipState.heading = Math.PI;
+  shipState.speed = 0;
+  shipState.targetSpeed = 0;
+  mode = "sailing";
+  player.visible = false;
+  showModal({
+    eyebrow: "Shipwreck",
+    title: "Stranded in the Sandsea",
+    lines: [
+      "The leviathan tore your skiff apart.",
+      `Lost half your cargo and ${STRAND_TOW_FEE}g towing fee.`,
+      `Towed back to ${port.name}, hull fully repaired.`,
+    ],
+    buttonText: "Set Sail Again",
+  });
+}
+
 const hitProbe = new THREE.Vector3();
 const crateWorldPos = new THREE.Vector3();
 const marketProbe = new THREE.Vector3();
+const treasureProbe = new THREE.Vector3(TREASURE_X, 0, TREASURE_Z);
 
 // 步行时最近的可交易集市（帐篷前 48 单位内）
 function findNearbyMarket() {
@@ -257,16 +297,36 @@ if (import.meta.env.DEV) {
     getMode: () => mode,
     getPlayerY: () => playerState.position.y,
     getState,
+    setState,
     goAshore,
     boardShip,
     clearSave,
     scene,
+    economy,
+    wormAi,
   };
 }
 
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
+
+  if (isModalOpen()) {
+    // 结算弹窗期间世界暂停接收输入，只维持渲染
+    clearFramePresses();
+    updateWorm(worm, elapsed);
+    updateHud(getState(), shipState.speed, ship.position);
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // 沙虫 AI：只在航行时构成威胁；咬击→红字提示；耐久归零→搁浅
+  const bitten = updateWormAi(delta, mode === "sailing");
+  if (bitten) {
+    const remaining = getState().hull;
+    showToast(`Leviathan bite! Hull ${remaining}`);
+    if (remaining <= 0) strand();
+  }
 
   if (mode === "sailing") {
     updateShip(ship, delta, elapsed);
@@ -284,16 +344,36 @@ function animate() {
     if (consumeClick() && startAttack()) tryBreakCrates();
     const market = findNearbyMarket();
     const nearShip = player.position.distanceTo(ship.position) < 60;
+    const state = getState();
+    const nearTreasure =
+      state.mapPurchased &&
+      !state.completed &&
+      player.position.distanceTo(treasureProbe) < 45;
     setAction(
-      market
-        ? `Press E to trade at ${market.name}`
-        : nearShip
-          ? "Press E to board the skiff"
-          : null,
+      nearTreasure
+        ? "Press E to open the relic chest"
+        : market
+          ? `Press E to trade at ${market.name}`
+          : nearShip
+            ? "Press E to board the skiff"
+            : null,
     );
-    if (market && consumePressed("KeyE")) {
+    if (nearTreasure && consumePressed("KeyE")) {
+      setState(openTreasure(state));
+      showModal({
+        eyebrow: "Legend Fulfilled",
+        title: "The Relic Chest Opens!",
+        lines: [
+          "Cyan light floods out of the ancient vault.",
+          `Treasure claimed: +${TREASURE_REWARD}g.`,
+          "The sandsea is yours, Captain. Keep sailing as long as you like.",
+        ],
+        buttonText: "Claim Glory",
+      });
+    } else if (market && consumePressed("KeyE")) {
       playerState.speed = 0;
       setAction(null);
+      setState(recordVisit(getState(), market.id));
       openTradePanel(market.id);
     } else if (nearShip && consumePressed("KeyE")) {
       boardShip();

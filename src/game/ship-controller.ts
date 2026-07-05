@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { isDown } from "../core/input";
 import { surfaceHeight, islandLift } from "../world/sand";
 import { SEA_OBSTACLES } from "../world/landmarks";
+import { sailSpeed } from "./data";
+import { getState } from "./store";
 
 export type ShipState = {
   position: THREE.Vector3;
@@ -35,7 +37,8 @@ export function updateShip(ship: THREE.Object3D, delta: number, elapsed: number)
   const rightInput = Number(isDown("KeyD") || isDown("ArrowRight"));
 
   const thrust = forwardInput - backInput * 0.62;
-  shipState.targetSpeed = thrust * 92;
+  // 最高速由帆等级决定（92/106/122/140）——L2 起正面跑赢沙虫(110)
+  shipState.targetSpeed = thrust * sailSpeed(getState());
   shipState.speed = THREE.MathUtils.damp(shipState.speed, shipState.targetSpeed, 2.5, delta);
 
   const turn = (leftInput - rightInput) * Math.max(Math.abs(shipState.speed), 28) * 0.0065;
