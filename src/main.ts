@@ -33,8 +33,9 @@ import {
 import { updateHud } from "./ui/hud";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
-import { getState, setState } from "./game/store";
+import { getState, setState, subscribe, resetState } from "./game/store";
 import { addGold } from "./game/economy";
+import { save, load, clearSave } from "./game/save";
 import { PORTS } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -141,6 +142,7 @@ function goAshore() {
 function boardShip() {
   mode = "sailing";
   player.visible = false;
+  save(getState(), shipSnapshot());
 }
 
 // 劈碎货箱的战利品直接进金库（+2 gold/箱）
@@ -224,6 +226,20 @@ initInput();
 initMouse();
 initMinimap();
 
+// 存档：启动恢复，之后每次状态变更（交易/劈箱等离散事件）自动写入
+const savedGame = load();
+if (savedGame) {
+  resetState(savedGame.state);
+  shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
+  shipState.heading = savedGame.ship.heading;
+}
+
+function shipSnapshot() {
+  return { x: shipState.position.x, z: shipState.position.z, heading: shipState.heading };
+}
+
+subscribe((state) => save(state, shipSnapshot()));
+
 // 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__game = {
@@ -243,6 +259,7 @@ if (import.meta.env.DEV) {
     getState,
     goAshore,
     boardShip,
+    clearSave,
   };
 }
 
