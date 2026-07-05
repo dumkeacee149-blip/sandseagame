@@ -21,8 +21,14 @@ const NPC_CHATTER: Array<[string, string]> = [
 let logEl: HTMLUListElement | null = null;
 let inputEl: HTMLInputElement | null = null;
 
+let lastMessageKey = "";
+
 function appendMessage(author: string, text: string, kind: ChatKind) {
   if (!logEl) return;
+  // 连续重复消息去重（防刷屏）
+  const key = `${author}|${text}`;
+  if (key === lastMessageKey) return;
+  lastMessageKey = key;
   const item = document.createElement("li");
   item.className = `chat-line chat-${kind}`;
   const who = document.createElement("b");
@@ -66,7 +72,11 @@ function sendCurrent() {
   closeChatInput();
 }
 
+let initialized = false;
+
 export function initChat() {
+  if (initialized) return;
+  initialized = true;
   logEl = document.querySelector<HTMLUListElement>("#chat-log");
   inputEl = document.querySelector<HTMLInputElement>("#chat-input");
   if (!inputEl) return;
@@ -91,14 +101,14 @@ export function initChat() {
 
   appendMessage("Harbormaster", "Welcome to the Sandsea, Captain. Markets are marked overhead.", "npc");
 
-  // 环境闲聊：25-45 秒一条，60% 概率发声，避免刷屏
+  // 环境闲聊：40-75 秒一条，顺序轮播不重复
+  let chatterIndex = Math.floor(Math.random() * NPC_CHATTER.length);
   const scheduleChatter = () => {
-    const delay = 25000 + Math.random() * 20000;
+    const delay = 40000 + Math.random() * 35000;
     setTimeout(() => {
-      if (Math.random() < 0.6) {
-        const [author, line] = NPC_CHATTER[Math.floor(Math.random() * NPC_CHATTER.length)];
-        appendMessage(author, line, "npc");
-      }
+      const [author, line] = NPC_CHATTER[chatterIndex % NPC_CHATTER.length];
+      chatterIndex += 1;
+      appendMessage(author, line, "npc");
       scheduleChatter();
     }, delay);
   };

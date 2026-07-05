@@ -27,10 +27,10 @@ const SPRINT_MULTIPLIER = 1.7;
 const TURN_SPEED = 2.6;
 const JUMP_VELOCITY = 56;
 const GRAVITY = 150;
-const ATTACK_DURATION = 0.32;
+// 0.6s 让混元 Attack 挥刀动作能被看清（0.32s 时快到只剩残影）
+const ATTACK_DURATION = 0.6;
 
 const tempVec = new THREE.Vector3();
-let slashPivot: THREE.Group | null = null;
 
 // 混元骨骼主角（H01 v1 正版）：AnimationMixer 四态状态机；加载失败回退体素占位
 let mixer: THREE.AnimationMixer | null = null;
@@ -56,6 +56,7 @@ export function createPlayerAvatar() {
 
   loadRiggedModel("/models/hero_rigged.glb")
     .then(({ scene: model, animations }) => {
+      // 朝向已实测核对：模型面朝 +Z 与游戏前进方向一致，无需旋转
       fitRiggedToPlaceholder(model, placeholder);
       rig.remove(placeholder);
       rig.add(model);
@@ -63,28 +64,17 @@ export function createPlayerAvatar() {
       for (const clip of animations) {
         actions[clip.name] = mixer.clipAction(clip);
       }
-      if (actions.Attack) {
+      const attackClip = animations.find((clip) => clip.name === "Attack");
+      if (actions.Attack && attackClip) {
         actions.Attack.setLoop(THREE.LoopOnce, 1);
-        // Attack clip 长 2s，压到游戏内 0.32s 的出手节奏
-        actions.Attack.timeScale = 6;
+        // 完整挥刀动作压进出手时长
+        actions.Attack.timeScale = attackClip.duration / ATTACK_DURATION;
       }
       playAction("Idle");
     })
     .catch((error) => {
       console.error("骨骼主角加载失败，保留体素占位", error);
     });
-
-  // 挥刀轨迹：攻击时绕玩家扫过的发光刀光
-  slashPivot = new THREE.Group();
-  slashPivot.position.y = 9;
-  const blade = new THREE.Mesh(
-    new THREE.BoxGeometry(3, 1.8, 17),
-    new THREE.MeshBasicMaterial({ color: "#d8fff4", transparent: true, opacity: 0.85 }),
-  );
-  blade.position.z = 13;
-  slashPivot.add(blade);
-  slashPivot.visible = false;
-  rig.add(slashPivot);
 
   return rig;
 }
@@ -144,17 +134,12 @@ export function updatePlayer(avatar: THREE.Object3D, delta: number, elapsed: num
   }
   avatar.rotation.y = playerState.heading;
 
-  // 挥刀动画：刀光从右向左扫 120°，身体微前倾
+  // 挥刀：动作由混元 Attack clip 承担，这里只保留身体微前倾的重量感
   if (playerState.attackTimer > 0) {
     playerState.attackTimer = Math.max(0, playerState.attackTimer - delta);
     const progress = 1 - playerState.attackTimer / ATTACK_DURATION;
-    if (slashPivot) {
-      slashPivot.visible = playerState.attackTimer > 0;
-      slashPivot.rotation.y = 1.1 - 2.2 * progress;
-    }
-    avatar.rotation.x = Math.sin(progress * Math.PI) * 0.14;
+    avatar.rotation.x = Math.sin(progress * Math.PI) * 0.1;
   } else {
-    if (slashPivot) slashPivot.visible = false;
     avatar.rotation.x = 0;
   }
 }

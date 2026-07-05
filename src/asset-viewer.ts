@@ -208,6 +208,12 @@ function fitAsset(asset: THREE.Group, targetExtent: number) {
   asset.position.y += -fittedBox.min.y + 0.2;
 }
 
+function applyReviewPose(asset: THREE.Group, assetId: string) {
+  if (assetId === "H02") {
+    asset.rotation.y = -Math.PI * 0.22;
+  }
+}
+
 function getPreferredHunyuanPath(index: number) {
   const assetId = ASSET_DEFINITIONS[index]?.id;
   if (!preferHunyuanAssets || !assetId) return null;
@@ -423,6 +429,7 @@ function setCompareCamera() {
 
 async function showAsset(index: number) {
   selectedIndex = index;
+  const definition = ASSET_DEFINITIONS[index];
   clearStage();
   stage.add(createSandFloor());
 
@@ -435,6 +442,7 @@ async function showAsset(index: number) {
 
   const asset = await createPreferredAsset(index);
   fitAsset(asset, window.innerWidth < 760 ? 4.25 : 5.2);
+  applyReviewPose(asset, definition.id);
   asset.position.y += 0.1;
   activeAsset = asset;
   stage.add(asset);
@@ -465,6 +473,7 @@ async function showSheet() {
       const hasHunyuanPath = Boolean(getPreferredHunyuanPath(index));
       const asset = await createPreferredAsset(index);
       fitAsset(asset, 2.9);
+      applyReviewPose(asset, definition.id);
       asset.position.y += 0.12;
       cell.add(asset);
 
