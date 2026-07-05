@@ -234,8 +234,8 @@ def export_glb(armature, mesh):
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = armature
     for obj in list(bpy.context.scene.objects):
-      if obj not in {armature, mesh}:
-          bpy.data.objects.remove(obj, do_unlink=True)
+        if obj not in {armature, mesh}:
+            bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.export_scene.gltf(
         filepath=OUT_GLB,
         export_format="GLB",

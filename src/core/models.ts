@@ -50,6 +50,38 @@ export function fitToPlaceholder(model: THREE.Object3D, placeholder: THREE.Objec
   model.position.set(-center.x, -bounds.min.y, -center.z);
 }
 
+// 蒙皮模型专用 fit：渲染尺寸由骨骼驱动，Box3.setFromObject 会被 FBX 转换的
+// 中间节点缩放(常见 0.01)误导；直接以 SkinnedMesh 几何包围盒(绑定姿态)为准，
+// 以占位物的"高度"为对齐目标（角色/生物的可读尺寸是身高不是脚印）
+export function fitRiggedToPlaceholder(
+  model: THREE.Object3D,
+  placeholder: THREE.Object3D,
+  rotateY = 0,
+) {
+  let geomBox: THREE.Box3 | null = null;
+  model.traverse((child) => {
+    const mesh = child as THREE.SkinnedMesh;
+    if (mesh.isSkinnedMesh) {
+      mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox;
+      if (bounds) geomBox = geomBox ? geomBox.union(bounds) : bounds.clone();
+    }
+  });
+  if (!geomBox) {
+    fitToPlaceholder(model, placeholder, rotateY);
+    return;
+  }
+  const box = geomBox as THREE.Box3;
+  const pBounds = new THREE.Box3().setFromObject(placeholder);
+  const targetHeight = pBounds.getSize(new THREE.Vector3()).y;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const scale = targetHeight / size.y;
+  model.scale.setScalar(scale);
+  model.rotation.y = rotateY;
+  model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+}
+
 // 占位组：先显示代码体素资产，混元模型加载完按占位脚印自动缩放换入；失败保留占位
 export function hunyuanSlot(placeholder: THREE.Object3D, url: string, rotateY = 0) {
   const slot = new THREE.Group();

@@ -337,7 +337,7 @@ function animate() {
   if (isModalOpen()) {
     // 结算弹窗期间世界暂停接收输入，只维持渲染
     clearFramePresses();
-    updateWorm(worm, elapsed);
+    updateWorm(worm, elapsed, delta);
     updateHud(getState(), shipState.speed, ship.position);
     renderer.render(scene, camera);
     return;
@@ -409,7 +409,7 @@ function animate() {
   clearFramePresses();
 
   updateSplinters(delta);
-  updateWorm(worm, elapsed);
+  updateWorm(worm, elapsed, delta);
   updateMarkers(elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;

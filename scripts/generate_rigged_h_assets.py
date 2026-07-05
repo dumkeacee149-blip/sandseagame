@@ -595,7 +595,8 @@ def build_leviathan():
         if other != obj:
             bpy.data.objects.remove(other, do_unlink=True)
 
-    delete_flat_a07_sand_base(obj)
+    # Keep the full Hunyuan A07 silhouette. The old automatic sand-base deletion
+    # removed too much of the creature body and made H02 look like half a beast.
 
     min_y = min((obj.matrix_world @ v.co).y for v in obj.data.vertices)
     max_y = max((obj.matrix_world @ v.co).y for v in obj.data.vertices)

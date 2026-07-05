@@ -36,6 +36,7 @@ const hunyuanAssetPaths = {
   A09: "/assets/hunyuan/raw/A09_hunyuan_harpoon_cannon_v1.glb",
   A10: "/assets/hunyuan/raw/A10_hunyuan_caravan_cart_v1.glb",
   H01: "/assets/hunyuan/raw/H01_hero_rigged_v1.glb",
+  H02: "/assets/hunyuan/raw/H02_sand_leviathan_rigged_v1.glb",
 } as const;
 let selectedIndex = Math.max(
   0,
@@ -231,7 +232,7 @@ async function loadHunyuanAsset(path: string, id: string) {
     }
   });
   if (gltf.animations.length > 0) {
-    const preferredClipNames = ["Idle", "Walk", "Run", "Attack"];
+    const preferredClipNames = ["Idle", "Walk", "Run", "Attack", "Swim", "Burrow", "Bite"];
     const preferredClips = preferredClipNames
       .map((name) => gltf.animations.find((clip) => clip.name === name))
       .filter((clip): clip is THREE.AnimationClip => Boolean(clip));

@@ -1,22 +1,50 @@
 import * as THREE from "three";
-import { hunyuanSlot } from "../core/models";
+import { loadRiggedModel, fitRiggedToPlaceholder } from "../core/models";
 import { mat } from "../core/materials";
 import { sandHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
 import { wormAi } from "../game/worm-ai";
 
-// 沙虫 = 混元静态模型 + 钻沙表演，位置/朝向/下潜由 game/worm-ai 状态机驱动。
-// 骨骼版 H02 等混元重新生成后接回（AnimationMixer 实现见 git e400f08 的 worm.ts）。
+// 沙虫 = 混元骨骼模型(H02 v1 正版: Swim/Burrow/Bite) + 钻沙表演，
+// 位置/朝向/下潜由 game/worm-ai 状态机驱动，动画 clip 跟随 AI 状态切换。
 const DUST_COUNT = 10;
+
+let wormMixer: THREE.AnimationMixer | null = null;
+const wormActions: Record<string, THREE.AnimationAction> = {};
+let currentWormAction = "";
+
+function playWormAction(name: string, fade = 0.3) {
+  if (!wormMixer || currentWormAction === name) return;
+  const next = wormActions[name];
+  if (!next) return;
+  const prev = wormActions[currentWormAction];
+  next.reset().fadeIn(fade).play();
+  if (prev) prev.fadeOut(fade);
+  currentWormAction = name;
+}
 
 export function createWorm() {
   const rig = new THREE.Group();
 
   const placeholder = createVoxelAsset("A07");
   placeholder.scale.setScalar(16);
-  const body = hunyuanSlot(placeholder, "/models/leviathan.glb");
-  body.name = "worm-body";
-  rig.add(body);
+  rig.add(placeholder);
+
+  loadRiggedModel("/models/leviathan_rigged.glb")
+    .then(({ scene: model, animations }) => {
+      fitRiggedToPlaceholder(model, placeholder);
+      rig.remove(placeholder);
+      model.name = "worm-body";
+      rig.add(model);
+      wormMixer = new THREE.AnimationMixer(model);
+      for (const clip of animations) {
+        wormActions[clip.name] = wormMixer.clipAction(clip);
+      }
+      playWormAction("Swim");
+    })
+    .catch((error) => {
+      console.error("骨骼沙虫加载失败，保留体素占位", error);
+    });
 
   const dust = new THREE.Group();
   dust.name = "worm-dust";
@@ -34,10 +62,17 @@ export function createWorm() {
   return rig;
 }
 
-export function updateWorm(rig: THREE.Group, elapsed: number) {
+export function updateWorm(rig: THREE.Group, elapsed: number, delta: number) {
   rig.position.x = wormAi.position.x;
   rig.position.z = wormAi.position.z;
   rig.rotation.y = wormAi.heading;
+
+  // 骨骼动画随 AI 状态：追击/巡逻=Swim，下潜=Burrow；Bite 由咬击瞬间触发更自然，
+  // 但 dive 前的一帧就是命中帧，用 Burrow 入沙代替收尾，Bite 留给未来受击特写
+  if (wormMixer) {
+    wormMixer.update(delta);
+    playWormAction(wormAi.mode === "dive" ? "Burrow" : "Swim");
+  }
 
   // 下潜量按 AI 状态：dive 全潜（逃跑窗口），chase 半露冲刺，patrol/return 浮游
   const targetSink =

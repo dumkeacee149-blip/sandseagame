@@ -11,7 +11,8 @@ export type VoxelAssetId =
   | "A08"
   | "A09"
   | "A10"
-  | "H01";
+  | "H01"
+  | "H02";
 
 export type VoxelAssetDefinition = {
   id: VoxelAssetId;
@@ -388,6 +389,13 @@ function createRiggedHeroFallback() {
   return group;
 }
 
+function createRiggedLeviathanFallback() {
+  const group = createSandseaLeviathan();
+  group.name = "rigged-leviathan-fallback";
+  group.userData.assetId = "H02";
+  return group;
+}
+
 export const ASSET_DEFINITIONS: VoxelAssetDefinition[] = [
   {
     id: "A01",
@@ -465,6 +473,13 @@ export const ASSET_DEFINITIONS: VoxelAssetDefinition[] = [
     zhName: "绑骨沙海私掠者",
     role: "Player avatar rig with gameplay animation clips",
     create: createRiggedHeroFallback,
+  },
+  {
+    id: "H02",
+    name: "Rigged Sandsea Leviathan",
+    zhName: "绑骨沙海巨兽",
+    role: "Boss creature rig with Swim / Burrow / Bite clips",
+    create: createRiggedLeviathanFallback,
   },
 ];
 
