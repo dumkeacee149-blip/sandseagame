@@ -352,39 +352,57 @@ function createSandLines() {
 
 scene.add(createSandLines());
 
-// 船体：优先加载混元压缩模型，失败则保留代码拼装的体素占位
-const ship = new THREE.Group();
-const shipPlaceholder = createVoxelAsset("A01");
-shipPlaceholder.scale.setScalar(9);
-ship.add(shipPlaceholder);
-scene.add(ship);
-
 const gltfLoader = new GLTFLoader();
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
-gltfLoader.load(
-  "/models/skiff.glb",
-  (gltf) => {
-    const model = gltf.scene;
-    const bounds = new THREE.Box3().setFromObject(model);
-    const size = bounds.getSize(new THREE.Vector3());
-    model.scale.setScalar(75 / Math.max(size.x, size.z));
-    model.rotation.y = Math.PI / 2;
-    bounds.setFromObject(model);
-    const center = bounds.getCenter(new THREE.Vector3());
-    model.position.set(-center.x, -bounds.min.y, -center.z);
-    ship.remove(shipPlaceholder);
-    ship.add(model);
-  },
-  undefined,
-  (error) => {
-    console.error("混元船体模型加载失败，继续使用体素占位", error);
-  },
-);
+
+const modelCache = new Map<string, Promise<THREE.Group>>();
+
+function loadModel(url: string) {
+  let cached = modelCache.get(url);
+  if (!cached) {
+    cached = new Promise<THREE.Group>((resolve, reject) => {
+      gltfLoader.load(url, (gltf) => resolve(gltf.scene), undefined, reject);
+    });
+    modelCache.set(url, cached);
+  }
+  return cached.then((scene) => scene.clone(true));
+}
+
+// 占位组：先显示代码体素资产，混元模型加载完按占位脚印自动缩放换入；失败保留占位
+function hunyuanSlot(placeholder: THREE.Object3D, url: string, rotateY = 0) {
+  const slot = new THREE.Group();
+  slot.add(placeholder);
+  const pBounds = new THREE.Box3().setFromObject(placeholder);
+  const pSize = pBounds.getSize(new THREE.Vector3());
+  const target = Math.max(pSize.x, pSize.z);
+  loadModel(url)
+    .then((model) => {
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      model.scale.setScalar(target / Math.max(size.x, size.z));
+      model.rotation.y = rotateY;
+      bounds.setFromObject(model);
+      const center = bounds.getCenter(new THREE.Vector3());
+      model.position.set(-center.x, -bounds.min.y, -center.z);
+      slot.clear();
+      slot.add(model);
+    })
+    .catch((error) => {
+      console.error(`混元模型加载失败，保留体素占位: ${url}`, error);
+    });
+  return slot;
+}
+
+const shipPlaceholder = createVoxelAsset("A01");
+shipPlaceholder.scale.setScalar(9);
+const ship = hunyuanSlot(shipPlaceholder, "/models/skiff.glb", Math.PI / 2);
+scene.add(ship);
 
 function createPalm(position: THREE.Vector3, scale = 1) {
-  const palm = createVoxelAsset("A04");
+  const placeholder = createVoxelAsset("A04");
+  placeholder.scale.setScalar(11 * scale);
+  const palm = hunyuanSlot(placeholder, "/models/palm.glb");
   palm.position.copy(position);
-  palm.scale.setScalar(11 * scale);
   palm.rotation.y = Math.random() * Math.PI * 2;
   return palm;
 }
@@ -408,11 +426,26 @@ function createOasisPort() {
   group.add(box(190, 9, 24, dockMat, [18, 12, 108], [0, -0.16, 0]));
   group.add(box(90, 8, 26, dockMat, [-88, 13, 54], [0, 0.72, 0]));
 
-  const tent = createVoxelAsset("A03");
-  tent.scale.setScalar(11);
+  const tentPlaceholder = createVoxelAsset("A03");
+  tentPlaceholder.scale.setScalar(11);
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
   tent.position.set(-124, 0, -28);
   tent.rotation.y = Math.PI / 5;
   group.add(tent);
+
+  const heroPlaceholder = createVoxelAsset("A02");
+  heroPlaceholder.scale.setScalar(4.5);
+  const hero = hunyuanSlot(heroPlaceholder, "/models/hero.glb");
+  hero.position.set(-28, 0, 74);
+  hero.rotation.y = Math.PI * 0.85;
+  group.add(hero);
+
+  const cannonPlaceholder = createVoxelAsset("A09");
+  cannonPlaceholder.scale.setScalar(5);
+  const cannon = hunyuanSlot(cannonPlaceholder, "/models/cannon.glb");
+  cannon.position.set(38, 0, 62);
+  cannon.rotation.y = -Math.PI / 3;
+  group.add(cannon);
 
   for (let i = 0; i < 7; i += 1) {
     const angle = (i / 7) * Math.PI * 2;
@@ -447,8 +480,9 @@ function createRuins() {
   const group = new THREE.Group();
   group.position.set(650, 0, 280);
 
-  const gate = createVoxelAsset("A05");
-  gate.scale.setScalar(18);
+  const gatePlaceholder = createVoxelAsset("A05");
+  gatePlaceholder.scale.setScalar(18);
+  const gate = hunyuanSlot(gatePlaceholder, "/models/gate.glb");
   gate.position.set(0, 0, -30);
   group.add(gate);
 
@@ -458,12 +492,20 @@ function createRuins() {
     [60, -160, 15, 3.6],
   ];
   obeliskSpots.forEach(([x, z, scale, rotY]) => {
-    const obelisk = createVoxelAsset("A06");
-    obelisk.scale.setScalar(scale);
+    const placeholder = createVoxelAsset("A06");
+    placeholder.scale.setScalar(scale);
+    const obelisk = hunyuanSlot(placeholder, "/models/obelisk.glb");
     obelisk.position.set(x, 0, z);
     obelisk.rotation.y = rotY;
     group.add(obelisk);
   });
+
+  const chestPlaceholder = createVoxelAsset("A08");
+  chestPlaceholder.scale.setScalar(7);
+  const chest = hunyuanSlot(chestPlaceholder, "/models/chest.glb");
+  chest.position.set(52, 0, 34);
+  chest.rotation.y = -0.5;
+  group.add(chest);
 
   const light = new THREE.PointLight("#69f1df", 2.8, 360);
   light.position.set(0, 78, 24);
@@ -493,8 +535,9 @@ function createSaltFlats() {
 scene.add(createSaltFlats());
 
 function createWorm() {
-  const worm = createVoxelAsset("A07");
-  worm.scale.setScalar(16);
+  const placeholder = createVoxelAsset("A07");
+  placeholder.scale.setScalar(16);
+  const worm = hunyuanSlot(placeholder, "/models/leviathan.glb");
   worm.position.set(760, sandHeight(760, -680), -680);
   return worm;
 }
@@ -506,8 +549,9 @@ function createDistantCaravans() {
   const group = new THREE.Group();
 
   for (let i = 0; i < 7; i += 1) {
-    const caravan = createVoxelAsset("A10");
-    caravan.scale.setScalar(8);
+    const placeholder = createVoxelAsset("A10");
+    placeholder.scale.setScalar(8);
+    const caravan = hunyuanSlot(placeholder, "/models/cart.glb");
     const x = -780 + i * 108;
     const z = 560 + Math.sin(i) * 34;
     caravan.position.set(x, sandHeight(x, z), z);
@@ -623,6 +667,18 @@ function onResize() {
 window.addEventListener("resize", onResize);
 window.addEventListener("keydown", (event) => keys.add(event.code));
 window.addEventListener("keyup", (event) => keys.delete(event.code));
+
+// 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
+if (import.meta.env.DEV) {
+  (window as unknown as Record<string, unknown>).__game = {
+    teleport(x: number, z: number, heading?: number) {
+      shipState.position.set(x, 0, z);
+      if (heading !== undefined) shipState.heading = heading;
+      shipState.speed = 0;
+      shipState.targetSpeed = 0;
+    },
+  };
+}
 
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
