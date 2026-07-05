@@ -1,0 +1,126 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #17151b;
+  color: #f6ebd0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #17151b;
+}
+
+#asset-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.asset-hud {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(14px, 2.5vw, 28px);
+}
+
+.asset-header {
+  width: min(470px, calc(100vw - 28px));
+  padding: 14px 16px;
+  border: 1px solid rgba(246, 235, 208, 0.16);
+  background: rgba(22, 18, 24, 0.68);
+  box-shadow: 0 18px 42px rgba(8, 8, 12, 0.32);
+  backdrop-filter: blur(12px);
+}
+
+.asset-kicker {
+  margin: 0 0 7px;
+  color: #5ee6d5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.asset-header h1 {
+  margin: 0;
+  color: #fff8e4;
+  font-size: clamp(1.35rem, 3vw, 2.25rem);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.asset-header p:last-child {
+  margin: 7px 0 0;
+  color: #d9c6a1;
+  font-size: clamp(0.84rem, 1.5vw, 0.98rem);
+}
+
+.asset-tabs {
+  pointer-events: auto;
+  align-self: center;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(42px, 1fr));
+  gap: 8px;
+  width: min(760px, calc(100vw - 28px));
+  padding: 8px;
+  border: 1px solid rgba(246, 235, 208, 0.15);
+  background: rgba(20, 17, 22, 0.72);
+  box-shadow: 0 18px 42px rgba(8, 8, 12, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.asset-tab {
+  appearance: none;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid rgba(246, 235, 208, 0.16);
+  background: rgba(65, 52, 40, 0.5);
+  color: #f7edcf;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.asset-tab:hover {
+  border-color: rgba(94, 230, 213, 0.55);
+  background: rgba(39, 64, 67, 0.64);
+}
+
+.asset-tab[aria-current="true"] {
+  border-color: #5ee6d5;
+  background: #284f55;
+  color: #ffffff;
+}
+
+@media (max-width: 760px) {
+  .asset-hud {
+    padding: 12px;
+  }
+
+  .asset-header {
+    padding: 12px;
+  }
+
+  .asset-tabs {
+    grid-template-columns: repeat(5, minmax(42px, 1fr));
+  }
+}

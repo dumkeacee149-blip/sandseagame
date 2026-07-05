@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sandsea Privateers</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <main class="hud" aria-label="Sandsea privateers prototype status">
+      <section class="brand-strip">
+        <div>
+          <p class="eyebrow">Sandsea Privateers</p>
+          <h1>Dune Corsair</h1>
+        </div>
+        <div class="stat-grid">
+          <span><b id="speed">0</b> knots</span>
+          <span><b id="cargo">12</b> relics</span>
+          <span><b id="wind">NE</b> wind</span>
+        </div>
+      </section>
+      <section class="route-chip">
+        <span class="route-dot"></span>
+        <span id="route">Oasis Port / Sunken Gate / Glass Dunes</span>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
