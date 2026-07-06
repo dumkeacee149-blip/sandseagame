@@ -212,6 +212,9 @@ export function createDuneskullCamp() {
   // 门面：半埋的巨兽肋骨拱在集市正后方
   placeEnv(group, "/models/ribs.glb", 96, 6, -52, 0.35, 40);
 
+  // 颅骨拱门(D01)：跨在栈桥→集市的必经路上，双眼窝朝南迎客
+  placeEnv(group, "/models/skull_gate.glb", 72, 0, 110, 0, 50);
+
   const tentPlaceholder = createVoxelAsset("A03");
   tentPlaceholder.scale.setScalar(10);
   const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");

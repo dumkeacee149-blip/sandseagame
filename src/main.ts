@@ -55,6 +55,8 @@ import { updateWormAi, wormAi, wormAgents, damageWorm } from "./game/worm-ai";
 import type { WormAgent } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
 import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
+import { initPresence, presenceDebug } from "./net/presence";
+import { initRemoteShips, updateRemoteShips } from "./net/remote-ships";
 import {
   PORTS,
   TREASURE_X,
@@ -448,6 +450,10 @@ function startGame() {
     postChat("Harbormaster", `Wallet linked: ${shortIdentity()}. Your voyage is bound to it.`);
   }
 
+  // 同世界在线（可选叠加层）：未配置 presence 地址时两者都是空操作
+  initRemoteShips(scene);
+  initPresence(() => (mode === "walking" ? "walking" : "sailing"));
+
   renderer.setAnimationLoop(() => {
     animate();
     removeBootOverlay();
@@ -481,6 +487,7 @@ if (import.meta.env.DEV) {
     scene,
     economy,
     wormAi,
+    presenceDebug,
   };
 }
 
@@ -567,6 +574,7 @@ function animate() {
 
   // 步行/交易模式下船不受控但仍要贴地并停在逻辑位置（航行模式下等价于重复赋值）
   syncShipVisual(ship, elapsed);
+  updateRemoteShips(elapsed);
   syncHarpoonMount();
   updateSplinters(delta);
   updateBolts(delta);
