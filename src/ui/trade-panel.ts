@@ -1,13 +1,35 @@
-import type { GameState, GoodId, PortId, UpgradeId } from "../game/data";
-import { GOODS, UPGRADES, TREASURE_MAP_COST, TOKEN_RATE, cargoCapacity, cargoCount } from "../game/data";
-import { findPort, buyGood, sellGood, buyUpgrade, buyTreasureMap, exchangeTokens } from "../game/economy";
+import type { GameState, GoodId, PortId, UpgradeId, OutfitState } from "../game/data";
+import {
+  GOODS,
+  UPGRADES,
+  TREASURE_MAP_COST,
+  TOKEN_RATE,
+  HARPOON_COST,
+  OUTFIT_COLORS,
+  cargoCapacity,
+  cargoCount,
+} from "../game/data";
+import {
+  findPort,
+  buyGood,
+  sellGood,
+  buyUpgrade,
+  buyTreasureMap,
+  buyHarpoon,
+  setOutfit,
+  exchangeTokens,
+} from "../game/economy";
 import { getState, setState, subscribe } from "../game/store";
+import { applyOutfit } from "../game/player";
 
 const UPGRADE_LABELS: Record<UpgradeId, { name: string; unit: string }> = {
   sail: { name: "Sail", unit: "speed" },
   cargo: { name: "Cargo Hold", unit: "slots" },
   hull: { name: "Hull", unit: "HP" },
 };
+
+// 兑换代币功能暂不显示，等待后面迭代开放
+const SHOW_TOKEN_EXCHANGE = false;
 
 let panelEl: HTMLDivElement | null = null;
 let currentPort: PortId | null = null;
@@ -51,6 +73,18 @@ function ensurePanel() {
     }
     if (action === "treasure-map") {
       setState(buyTreasureMap(getState()));
+      return;
+    }
+    if (action === "harpoon") {
+      setState(buyHarpoon(getState()));
+      return;
+    }
+    if (action === "outfit") {
+      const slot = button.dataset.slot as keyof OutfitState;
+      const color = button.dataset.color ?? "";
+      const next = setOutfit(getState(), slot, color);
+      setState(next);
+      applyOutfit(next.outfit);
       return;
     }
     if (action === "exchange") {
@@ -127,6 +161,37 @@ function render(state: GameState) {
     })
     .join("");
 
+  // 鱼叉炮：猎杀沙虫的门槛（Shipwright 追加行）
+  const harpoonRow = `
+      <div class="trade-row">
+        <div class="trade-good"><b>Harpoon Cannon</b><span>${state.harpoon ? "mounted · left-click while sailing" : "hunt the leviathan · 20 dmg per bolt"}</span></div>
+        <div class="trade-actions trade-upgrade">${
+          state.harpoon
+            ? `<span class="trade-na">MOUNTED</span>`
+            : `<button data-action="harpoon" ${state.gold >= HARPOON_COST ? "" : "disabled"}>Mount · ${HARPOON_COST}g</button>`
+        }</div>
+      </div>`;
+
+  // 更衣室：三槽六色
+  const outfitSlots: Array<{ slot: keyof OutfitState; label: string }> = [
+    { slot: "bandana", label: "Bandana" },
+    { slot: "cloth", label: "Cloak" },
+    { slot: "leather", label: "Leathers" },
+  ];
+  const outfitRows = outfitSlots
+    .map(({ slot, label }) => {
+      const swatches = OUTFIT_COLORS.map(
+        (color) =>
+          `<button class="swatch ${state.outfit[slot] === color ? "swatch-active" : ""}" data-action="outfit" data-slot="${slot}" data-color="${color}" style="background:${color}" aria-label="${label} ${color}"></button>`,
+      ).join("");
+      return `
+      <div class="trade-row">
+        <div class="trade-good"><b>${label}</b></div>
+        <div class="trade-actions trade-upgrade">${swatches}</div>
+      </div>`;
+    })
+    .join("");
+
   // 藏宝图只在危险远港 Duneskull 出售（主题自洽：越险的地方越接近传说）
   const treasureRow =
     port.id === "duneskull" && !state.completed
@@ -143,7 +208,9 @@ function render(state: GameState) {
       : "";
 
   // 金库兑换：金币 → $SAND（预发布记账，TGE 后接链上结算）
-  const exchangeRow = `
+  const exchangeRow = !SHOW_TOKEN_EXCHANGE
+    ? ""
+    : `
       <p class="trade-eyebrow trade-section">Token Vault</p>
       <div class="trade-row">
         <div class="trade-good"><b>$SAND Ledger</b><span>holding ${state.tokens} · pre-launch ledger, settles on-chain at token launch</span></div>
@@ -163,6 +230,9 @@ function render(state: GameState) {
     ${rows}
     <p class="trade-eyebrow trade-section">Shipwright Upgrades</p>
     ${upgradeRows}
+    ${harpoonRow}
+    <p class="trade-eyebrow trade-section">Dressing Room</p>
+    ${outfitRows}
     ${treasureRow}
     ${exchangeRow}
     <p class="trade-hint">E / Esc to leave</p>`;

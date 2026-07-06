@@ -3,28 +3,77 @@ import { loadRiggedModel, fitRiggedToPlaceholder } from "../core/models";
 import { mat } from "../core/materials";
 import { sandHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
-import { wormAi } from "../game/worm-ai";
+import { WORM_MAX_HP } from "../game/data";
+import type { WormAgent } from "../game/worm-ai";
 
-// 沙虫 = 混元骨骼模型(H02 v1 正版: Swim/Burrow/Bite) + 钻沙表演，
-// 位置/朝向/下潜由 game/worm-ai 状态机驱动，动画 clip 跟随 AI 状态切换。
+// 沙虫渲染（多实例）：每只 rig 携带自己的 mixer/动作/血条（存 userData），
+// 位置/朝向/下潜由对应 WormAgent 驱动，动画 clip 跟随 AI 状态切换。
 const DUST_COUNT = 10;
 
-let wormMixer: THREE.AnimationMixer | null = null;
-const wormActions: Record<string, THREE.AnimationAction> = {};
-let currentWormAction = "";
+type WormRigData = {
+  mixer: THREE.AnimationMixer | null;
+  actions: Record<string, THREE.AnimationAction>;
+  current: string;
+  hpCtx: CanvasRenderingContext2D | null;
+  hpTexture: THREE.CanvasTexture | null;
+  hpSprite: THREE.Sprite | null;
+  lastHp: number;
+};
 
-function playWormAction(name: string, fade = 0.3) {
-  if (!wormMixer || currentWormAction === name) return;
-  const next = wormActions[name];
+function playRigAction(data: WormRigData, name: string, fade = 0.3) {
+  if (!data.mixer || data.current === name) return;
+  const next = data.actions[name];
   if (!next) return;
-  const prev = wormActions[currentWormAction];
+  const prev = data.actions[data.current];
   next.reset().fadeIn(fade).play();
   if (prev) prev.fadeOut(fade);
-  currentWormAction = name;
+  data.current = name;
+}
+
+function buildHpBar(rig: THREE.Group, data: WormRigData) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 20;
+  data.hpCtx = canvas.getContext("2d");
+  data.hpTexture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: data.hpTexture, transparent: true, depthWrite: false }),
+  );
+  sprite.scale.set(56, 9, 1);
+  sprite.position.y = 46;
+  sprite.visible = false;
+  data.hpSprite = sprite;
+  rig.add(sprite);
+}
+
+function drawHpBar(data: WormRigData, hp: number) {
+  const ctx = data.hpCtx;
+  if (!ctx || !data.hpTexture) return;
+  ctx.clearRect(0, 0, 128, 20);
+  ctx.fillStyle = "rgba(24, 14, 5, 0.82)";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 128, 20, 9);
+  ctx.fill();
+  const ratio = Math.max(0, hp / WORM_MAX_HP);
+  ctx.fillStyle = ratio > 0.5 ? "#c8442f" : "#ff6a3d";
+  ctx.beginPath();
+  ctx.roundRect(3, 3, 122 * ratio, 14, 6);
+  ctx.fill();
+  data.hpTexture.needsUpdate = true;
 }
 
 export function createWorm() {
   const rig = new THREE.Group();
+  const data: WormRigData = {
+    mixer: null,
+    actions: {},
+    current: "",
+    hpCtx: null,
+    hpTexture: null,
+    hpSprite: null,
+    lastHp: WORM_MAX_HP,
+  };
+  rig.userData.worm = data;
 
   const placeholder = createVoxelAsset("A07");
   placeholder.scale.setScalar(16);
@@ -36,15 +85,15 @@ export function createWorm() {
       rig.remove(placeholder);
       model.name = "worm-body";
       rig.add(model);
-      wormMixer = new THREE.AnimationMixer(model);
+      data.mixer = new THREE.AnimationMixer(model);
       for (const clip of animations) {
-        wormActions[clip.name] = wormMixer.clipAction(clip);
+        data.actions[clip.name] = data.mixer.clipAction(clip);
       }
-      if (wormActions.Bite) {
-        wormActions.Bite.setLoop(THREE.LoopOnce, 1);
-        wormActions.Bite.clampWhenFinished = true;
+      if (data.actions.Bite) {
+        data.actions.Bite.setLoop(THREE.LoopOnce, 1);
+        data.actions.Bite.clampWhenFinished = true;
       }
-      playWormAction("Swim");
+      playRigAction(data, "Swim");
     })
     .catch((error) => {
       console.error("骨骼沙虫加载失败，保留体素占位", error);
@@ -61,37 +110,49 @@ export function createWorm() {
   }
   rig.add(dust);
 
-  rig.position.copy(wormAi.position);
-  rig.position.y = sandHeight(wormAi.position.x, wormAi.position.z);
+  buildHpBar(rig, data);
   return rig;
 }
 
-export function updateWorm(rig: THREE.Group, elapsed: number, delta: number) {
-  rig.position.x = wormAi.position.x;
-  rig.position.z = wormAi.position.z;
-  rig.rotation.y = wormAi.heading;
+export function updateWorm(rig: THREE.Group, agent: WormAgent, elapsed: number, delta: number) {
+  const data = rig.userData.worm as WormRigData;
 
-  // 骨骼动画随 AI 状态：咬击=Bite，追击/巡逻=Swim，下潜=Burrow。
-  if (wormMixer) {
-    wormMixer.update(delta);
-    playWormAction(wormAi.mode === "bite" ? "Bite" : wormAi.mode === "dive" ? "Burrow" : "Swim");
+  rig.position.x = agent.position.x;
+  rig.position.z = agent.position.z;
+  rig.rotation.y = agent.heading;
+
+  // 死亡：沉入沙下等待重生（血条隐藏、沙尘平息）
+  const dead = agent.mode === "dead";
+
+  if (data.mixer) {
+    data.mixer.update(delta);
+    playRigAction(
+      data,
+      agent.mode === "bite" ? "Bite" : agent.mode === "dive" || dead ? "Burrow" : "Swim",
+    );
   }
 
-  // 下潜量按 AI 状态：dive 全潜（逃跑窗口），chase 半露冲刺，patrol/return 浮游
-  const targetSink =
-    wormAi.mode === "dive" ? 30 : wormAi.mode === "chase" || wormAi.mode === "bite" ? 6 : 3;
-  const bob = Math.sin(elapsed * (wormAi.mode === "chase" || wormAi.mode === "bite" ? 3.2 : 1.6)) * 3;
+  const aggressive = agent.mode === "chase" || agent.mode === "bite";
+  const targetSink = dead ? 60 : agent.mode === "dive" ? 30 : aggressive ? 6 : 3;
+  const bob = dead ? 0 : Math.sin(elapsed * (aggressive ? 3.2 : 1.6)) * 3;
   rig.position.y = sandHeight(rig.position.x, rig.position.z) + bob - targetSink;
 
-  // 游动的波浪姿态：追击时更凶
-  const intensity = wormAi.mode === "chase" || wormAi.mode === "bite" ? 2 : 1;
-  rig.rotation.x = Math.sin(elapsed * 2.1 * intensity) * 0.1 * intensity;
-  rig.rotation.z = Math.sin(elapsed * 1.3) * 0.06;
+  rig.rotation.x = dead ? 0.4 : Math.sin(elapsed * 2.1 * (aggressive ? 2 : 1)) * 0.1 * (aggressive ? 2 : 1);
+  rig.rotation.z = dead ? 0 : Math.sin(elapsed * 1.3) * 0.06;
 
-  // 沙尘环：贴着沙面翻滚；追击/下潜时更剧烈（土里有东西在动）
+  // 血条：受过伤且存活才显示；数值变化时重绘
+  if (data.hpSprite) {
+    data.hpSprite.visible = !dead && agent.hp < WORM_MAX_HP;
+    if (agent.hp !== data.lastHp) {
+      data.lastHp = agent.hp;
+      drawHpBar(data, agent.hp);
+    }
+  }
+
   const dust = rig.getObjectByName("worm-dust");
   if (dust) {
-    const lively = wormAi.mode === "chase" || wormAi.mode === "bite" ? 2.2 : wormAi.mode === "dive" ? 2.6 : 1;
+    dust.visible = !dead;
+    const lively = aggressive ? 2.2 : agent.mode === "dive" ? 2.6 : 1;
     dust.rotation.y = -rig.rotation.y + elapsed * 0.7 * lively;
     dust.position.y = -rig.position.y + sandHeight(rig.position.x, rig.position.z) + 2;
     dust.children.forEach((chunk, index) => {

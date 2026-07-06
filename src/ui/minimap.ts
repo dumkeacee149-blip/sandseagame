@@ -1,6 +1,7 @@
 import type * as THREE from "three";
 import { ISLANDS } from "../world/sand";
 import { PORTS } from "../game/data";
+import type { WormAgent } from "../game/worm-ai";
 
 // 右上角小地图：圆形羊皮纸航海图——罗盘刻度环、墨线岛屿、锚点港口、
 // 黄铜船头箭标、沙虫红色警戒点。与"船长的航海桌"设计系统同语言。
@@ -31,7 +32,7 @@ export function updateMinimap(
   shipHeading: number,
   playerPosition: THREE.Vector3,
   walking: boolean,
-  wormPosition: THREE.Vector3,
+  worms: readonly WormAgent[],
   elapsed: number,
 ) {
   if (!ctx) return;
@@ -86,9 +87,10 @@ export function updateMinimap(
     ctx.fill();
   }
 
-  // 沙虫：红点 + 扩散警戒圈
-  {
-    const [x, y] = toMap(wormPosition.x, wormPosition.z);
+  // 沙虫：每只一个红点 + 扩散警戒圈（死亡等待重生的不显示）
+  for (const agent of worms) {
+    if (agent.mode === "dead") continue;
+    const [x, y] = toMap(agent.position.x, agent.position.z);
     const ripple = (elapsed % 1.6) / 1.6;
     ctx.beginPath();
     ctx.arc(x, y, 3 + ripple * 7, 0, Math.PI * 2);

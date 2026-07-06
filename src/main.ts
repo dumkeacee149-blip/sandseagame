@@ -39,6 +39,7 @@ import {
   updatePlayer,
   updateWalkCamera,
   startAttack,
+  applyOutfit,
 } from "./game/player";
 import { updateHud } from "./ui/hud";
 import { initQuests } from "./ui/quests";
@@ -49,10 +50,22 @@ import { showModal, isModalOpen } from "./ui/modal";
 import { getState, setState, subscribe, resetState } from "./game/store";
 import * as economy from "./game/economy";
 import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, dockAt, undock } from "./game/economy";
-import { updateWormAi, wormAi } from "./game/worm-ai";
+import { updateWormAi, wormAi, wormAgents, damageWorm } from "./game/worm-ai";
+import type { WormAgent } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
 import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
-import { PORTS, TREASURE_X, TREASURE_Z, TREASURE_REWARD, STRAND_TOW_FEE, DOCK_RADIUS } from "./game/data";
+import {
+  PORTS,
+  TREASURE_X,
+  TREASURE_Z,
+  TREASURE_REWARD,
+  STRAND_TOW_FEE,
+  DOCK_RADIUS,
+  HARPOON_DAMAGE,
+  HARPOON_RANGE,
+  HARPOON_COOLDOWN,
+  WORM_BOUNTY,
+} from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -134,8 +147,12 @@ scene.add(createSaltFlats());
 scene.add(createSaltcrestCamp());
 scene.add(createSeaScatter());
 scene.add(createMarketMarkers());
-const worm = createWorm();
-scene.add(worm);
+// 三只沙虫：各守一块领地（worm-ai 的 wormAgents 一一对应）
+const worms = wormAgents.map(() => {
+  const rig = createWorm();
+  scene.add(rig);
+  return rig;
+});
 scene.add(createDistantCaravans());
 const windParticles = createWindParticles();
 scene.add(windParticles);
@@ -274,6 +291,65 @@ function strand() {
   });
 }
 
+// ===== 鱼叉炮：航行模式的猎虫武器（门槛=船坞购置）=====
+type HarpoonBolt = { mesh: THREE.Mesh; target: WormAgent };
+const bolts: HarpoonBolt[] = [];
+const boltGeometry = new THREE.BoxGeometry(2.2, 2.2, 15);
+let harpoonCooldown = 0;
+
+function fireHarpoon() {
+  if (harpoonCooldown > 0) return;
+  // 锁定射程内最近的存活沙虫
+  let target: WormAgent | null = null;
+  let best = HARPOON_RANGE;
+  for (const agent of wormAgents) {
+    if (agent.mode === "dead") continue;
+    const d = Math.hypot(agent.position.x - shipState.position.x, agent.position.z - shipState.position.z);
+    if (d < best) {
+      best = d;
+      target = agent;
+    }
+  }
+  if (!target) {
+    showToast("No leviathan in harpoon range");
+    harpoonCooldown = 0.3;
+    return;
+  }
+  harpoonCooldown = HARPOON_COOLDOWN;
+  const mesh = new THREE.Mesh(boltGeometry, mat("harpoon-bolt", "#ecc06a"));
+  mesh.position.copy(ship.position);
+  mesh.position.y += 16;
+  scene.add(mesh);
+  bolts.push({ mesh, target });
+}
+
+function updateBolts(delta: number) {
+  for (let i = bolts.length - 1; i >= 0; i -= 1) {
+    const bolt = bolts[i];
+    const targetPos = bolt.target.position;
+    const aim = new THREE.Vector3(targetPos.x, bolt.mesh.position.y, targetPos.z);
+    const distance = bolt.mesh.position.distanceTo(aim);
+    if (distance < 18 || bolt.target.mode === "dead") {
+      scene.remove(bolt.mesh);
+      bolts.splice(i, 1);
+      if (bolt.target.mode !== "dead") {
+        const died = damageWorm(bolt.target, HARPOON_DAMAGE);
+        spawnSplinters(new THREE.Vector3(targetPos.x, bolt.mesh.position.y, targetPos.z));
+        if (died) {
+          setState(economy.recordWormKill(getState()));
+          showToast(`Leviathan slain! +${WORM_BOUNTY}g bounty`);
+          postChat("Lookout", `The leviathan sinks beneath the dunes! Bounty +${WORM_BOUNTY}g. It will stir again…`);
+        } else {
+          showToast(`Harpoon hit! Leviathan ${bolt.target.hp} HP`);
+        }
+      }
+      continue;
+    }
+    bolt.mesh.lookAt(aim);
+    bolt.mesh.position.addScaledVector(aim.sub(bolt.mesh.position).normalize(), Math.min(340 * delta, distance));
+  }
+}
+
 const hitProbe = new THREE.Vector3();
 const crateWorldPos = new THREE.Vector3();
 const marketProbe = new THREE.Vector3();
@@ -342,6 +418,7 @@ function startGame() {
     shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
     shipState.heading = savedGame.ship.heading;
   }
+  applyOutfit(getState().outfit);
   subscribe((state) => save(state, shipSnapshot()));
 
   if (isWalletLinked()) {
@@ -393,13 +470,13 @@ function animate() {
   if (isModalOpen()) {
     // 结算弹窗期间世界暂停接收输入，只维持渲染
     clearFramePresses();
-    updateWorm(worm, elapsed, delta);
+    worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
     updateHud(getState(), shipState.speed, ship.position);
     renderer.render(scene, camera);
     return;
   }
 
-  // 沙虫 AI：只在航行时构成威胁；咬击→红字提示；耐久归零→搁浅
+  // 沙虫 AI：攻击圈内的船与步行角色都会被持续追咬；咬击→红字提示；耐久归零→搁浅
   const bitten = updateWormAi(delta, mode === "sailing");
   if (bitten) {
     const remaining = getState().hull;
@@ -412,6 +489,9 @@ function animate() {
     updateShip(ship, delta, elapsed);
     updateCameraOrbit();
     updateCamera(camera, ship, delta, cameraOrbit);
+    // 鱼叉炮：装备后航行中左键发射
+    harpoonCooldown = Math.max(0, harpoonCooldown - delta);
+    if (consumeClick() && getState().harpoon) fireHarpoon();
     const canGoAshore = Math.abs(shipState.speed) < 8;
     setAction(canGoAshore ? "Press E to go ashore" : null);
     if (canGoAshore && consumePressed("KeyE")) goAshore();
@@ -467,13 +547,14 @@ function animate() {
   // 步行/交易模式下船不受控但仍要贴地并停在逻辑位置（航行模式下等价于重复赋值）
   syncShipVisual(ship, elapsed);
   updateSplinters(delta);
-  updateWorm(worm, elapsed, delta);
+  updateBolts(delta);
+  worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
   updateMarkers(elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
   updateHud(getState(), shipState.speed, ship.position);
-  updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", worm.position, elapsed);
+  updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", wormAgents, elapsed);
   renderer.render(scene, camera);
 }
 

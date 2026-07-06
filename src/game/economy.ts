@@ -1,7 +1,10 @@
 import type { GameState, GoodId, PortId, UpgradeId } from "./data";
+import type { OutfitState } from "./data";
 import {
   PORTS,
   UPGRADES,
+  HARPOON_COST,
+  WORM_BOUNTY,
   STRAND_TOW_FEE,
   TREASURE_MAP_COST,
   TREASURE_REWARD,
@@ -136,6 +139,23 @@ export function exchangeTokens(state: GameState, count: number): GameState {
   const cost = count * TOKEN_RATE;
   if (count <= 0 || state.gold < cost) return state;
   return { ...state, gold: state.gold - cost, tokens: state.tokens + count };
+}
+
+// 船坞购置鱼叉炮：猎杀沙虫的门槛
+export function buyHarpoon(state: GameState): GameState {
+  if (state.harpoon || state.gold < HARPOON_COST) return state;
+  return { ...state, gold: state.gold - HARPOON_COST, harpoon: true };
+}
+
+// 击杀沙虫：赏金 + 战绩
+export function recordWormKill(state: GameState): GameState {
+  return { ...state, gold: state.gold + WORM_BOUNTY, wormKills: state.wormKills + 1 };
+}
+
+// 更衣室换色
+export function setOutfit(state: GameState, slot: keyof OutfitState, color: string): GameState {
+  if (state.outfit[slot] === color) return state;
+  return { ...state, outfit: { ...state.outfit, [slot]: color } };
 }
 
 export function buyTreasureMap(state: GameState): GameState {

@@ -27,6 +27,8 @@ const QUESTS: readonly Quest[] = [
   { id: "survive", text: "Survive a leviathan bite", reward: 25, done: (s) => s.bitesSurvived >= 1 },
   { id: "duneskull", text: "Reach Duneskull Outpost", reward: 50, done: (s) => s.visited.includes("duneskull") },
   { id: "sail2", text: "Upgrade sails to L2 — outrun the leviathan", reward: 60, done: (s) => s.upgrades.sail >= 2 },
+  { id: "harpoon", text: "Mount a harpoon cannon at the shipwright", reward: 40, done: (s) => s.harpoon },
+  { id: "slay", text: "Slay a leviathan", reward: 80, done: (s) => s.wormKills >= 1 },
   { id: "map", text: "Buy the treasure map at Duneskull", reward: 100, done: (s) => s.mapPurchased },
   { id: "chest", text: "Open the relic chest in the Sunken Ruins", reward: 200, done: (s) => s.completed },
 ] as const;
@@ -34,24 +36,22 @@ const QUESTS: readonly Quest[] = [
 let panelEl: HTMLDivElement | null = null;
 let claiming = false;
 
-// 自动发奖：达成即领；连锁达成（奖励让金币达标下一个任务）循环处理直至稳定
+// 严格链式发奖：只有"当前环"可以完成——后面环的条件即使提前满足也不计，
+// 直到轮到它（届时条件已满足则立即完成）。连锁达成循环处理直至稳定。
 function claimDueRewards() {
   if (claiming) return;
   claiming = true;
   try {
     for (let guard = 0; guard < QUESTS.length + 1; guard += 1) {
       const state = getState();
-      const due = QUESTS.filter((quest) => quest.done(state) && !state.claimedQuests.includes(quest.id));
-      if (due.length === 0) break;
-      const total = due.reduce((sum, quest) => sum + quest.reward, 0);
+      const next = QUESTS.find((quest) => !state.claimedQuests.includes(quest.id));
+      if (!next || !next.done(state)) break;
       setState({
         ...state,
-        gold: state.gold + total,
-        claimedQuests: [...state.claimedQuests, ...due.map((quest) => quest.id)],
+        gold: state.gold + next.reward,
+        claimedQuests: [...state.claimedQuests, next.id],
       });
-      for (const quest of due) {
-        postChat("Quartermaster", `Quest complete: ${quest.text} (+${quest.reward}g)`);
-      }
+      postChat("Quartermaster", `Quest complete: ${next.text} (+${next.reward}g)`);
     }
   } finally {
     claiming = false;

@@ -1,19 +1,40 @@
 import * as THREE from "three";
 import { shipState } from "./ship-controller";
+import { playerState } from "./player";
 import { getState, setState } from "./store";
 import { applyWormBite } from "./economy";
+import { WORM_MAX_HP, WORM_RESPAWN_SECONDS } from "./data";
 
-// 沙虫 AI 状态机（数值来自 plan §2 的分水岭设计）：
+// 沙虫 AI（多实例）：每只有自己的领地与状态机。
+// 攻击判定以沙虫自身为圆心：目标（航行中的船或步行角色）进入 ATTACK_RANGE
+// 就持续循环 追击→咬→潜沙→再追，跑出 ATTACK_RANGE 才收手回巢。
 // 追速 110 卡在帆 L1(106) 与 L2(122) 之间——L1 逃不掉，L2 起正面跑赢；
 // 转向上限 0.55 rad/s 低于船的 0.60，蛇形走位可甩位。
-export type WormAiMode = "patrol" | "chase" | "bite" | "dive" | "return";
+export type WormAiMode = "patrol" | "chase" | "bite" | "dive" | "return" | "dead";
 
-const TERRITORY_X = 760;
-const TERRITORY_Z = -680;
-const TERRITORY_RADIUS = 420;
-const LEASH_RADIUS = 540;
-const AGGRO_RANGE = 500;
-const DROP_RANGE = 450;
+export type WormTerritory = {
+  readonly x: number;
+  readonly z: number;
+  readonly radius: number;
+  readonly leash: number;
+};
+
+export type WormAgent = {
+  readonly id: number;
+  readonly territory: WormTerritory;
+  mode: WormAiMode;
+  position: THREE.Vector3;
+  heading: number;
+  hp: number;
+  patrolTargetX: number;
+  patrolTargetZ: number;
+  patrolTimer: number;
+  biteTimer: number;
+  diveTimer: number;
+  respawnTimer: number;
+};
+
+const ATTACK_RANGE = 450;
 const PATROL_SPEED = 40;
 const CHASE_SPEED = 110;
 const RETURN_SPEED = 60;
@@ -23,102 +44,165 @@ const BITE_DAMAGE = 35;
 const BITE_DURATION = 0.55;
 const DIVE_DURATION = 3;
 
-export const wormAi = {
-  mode: "patrol" as WormAiMode,
-  position: new THREE.Vector3(TERRITORY_X, 0, TERRITORY_Z),
+// 三块领地：原巢 + 西南深沙 + 南航道旁（都避开港口停靠区）
+const TERRITORIES: readonly WormTerritory[] = [
+  { x: 760, z: -680, radius: 420, leash: 540 },
+  { x: -950, z: 850, radius: 360, leash: 470 },
+  { x: -60, z: -1080, radius: 360, leash: 470 },
+];
+
+export const wormAgents: WormAgent[] = TERRITORIES.map((territory, id) => ({
+  id,
+  territory,
+  mode: "patrol",
+  position: new THREE.Vector3(territory.x, 0, territory.z),
   heading: 0,
-  patrolTargetX: TERRITORY_X,
-  patrolTargetZ: TERRITORY_Z,
+  hp: WORM_MAX_HP,
+  patrolTargetX: territory.x,
+  patrolTargetZ: territory.z,
   patrolTimer: 0,
   biteTimer: 0,
   diveTimer: 0,
-};
+  respawnTimer: 0,
+}));
+
+// 兼容旧调试钩子与既有测试：wormAi 指向 0 号（原巢）沙虫
+export const wormAi = wormAgents[0];
 
 function wrapAngle(angle: number) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
-function moveToward(targetX: number, targetZ: number, speed: number, turnRate: number, delta: number) {
-  const desired = Math.atan2(targetX - wormAi.position.x, targetZ - wormAi.position.z);
-  const diff = wrapAngle(desired - wormAi.heading);
-  wormAi.heading += THREE.MathUtils.clamp(diff, -turnRate * delta, turnRate * delta);
-  wormAi.position.x += Math.sin(wormAi.heading) * speed * delta;
-  wormAi.position.z += Math.cos(wormAi.heading) * speed * delta;
+function moveToward(agent: WormAgent, targetX: number, targetZ: number, speed: number, turnRate: number, delta: number) {
+  const desired = Math.atan2(targetX - agent.position.x, targetZ - agent.position.z);
+  const diff = wrapAngle(desired - agent.heading);
+  agent.heading += THREE.MathUtils.clamp(diff, -turnRate * delta, turnRate * delta);
+  agent.position.x += Math.sin(agent.heading) * speed * delta;
+  agent.position.z += Math.cos(agent.heading) * speed * delta;
 }
 
-function pickPatrolTarget() {
+function pickPatrolTarget(agent: WormAgent) {
   const angle = Math.random() * Math.PI * 2;
-  const radius = Math.random() * 300;
-  wormAi.patrolTargetX = TERRITORY_X + Math.cos(angle) * radius;
-  wormAi.patrolTargetZ = TERRITORY_Z + Math.sin(angle) * radius;
-  wormAi.patrolTimer = 6;
+  const radius = Math.random() * agent.territory.radius * 0.72;
+  agent.patrolTargetX = agent.territory.x + Math.cos(angle) * radius;
+  agent.patrolTargetZ = agent.territory.z + Math.sin(angle) * radius;
+  agent.patrolTimer = 6;
 }
 
-function shipDistanceToCenter() {
-  return Math.hypot(shipState.position.x - TERRITORY_X, shipState.position.z - TERRITORY_Z);
+// 目标位置：航行时是船，上岸后是步行角色
+function targetPosition(sailing: boolean) {
+  return sailing ? shipState.position : playerState.position;
 }
 
-function shipDistanceToWorm() {
-  return Math.hypot(shipState.position.x - wormAi.position.x, shipState.position.z - wormAi.position.z);
+function targetDistanceToWorm(agent: WormAgent, sailing: boolean) {
+  const target = targetPosition(sailing);
+  return Math.hypot(target.x - agent.position.x, target.z - agent.position.z);
 }
 
-// 每帧驱动；sailing=false（玩家下船）时沙虫不追人只巡逻。
-// 返回本帧是否发生咬击（main 用来做受击反馈）。
-export function updateWormAi(delta: number, sailing: boolean): boolean {
+function wormDistanceToHome(agent: WormAgent) {
+  return Math.hypot(agent.position.x - agent.territory.x, agent.position.z - agent.territory.z);
+}
+
+// 被鱼叉命中：掉血、激怒（巡逻/返巢中也转追击）；打死返回 true
+export function damageWorm(agent: WormAgent, damage: number): boolean {
+  if (agent.mode === "dead") return false;
+  agent.hp = Math.max(0, agent.hp - damage);
+  if (agent.hp <= 0) {
+    agent.mode = "dead";
+    agent.respawnTimer = WORM_RESPAWN_SECONDS;
+    return true;
+  }
+  if (agent.mode === "patrol" || agent.mode === "return") {
+    agent.mode = "chase";
+  }
+  return false;
+}
+
+function updateAgent(agent: WormAgent, delta: number, sailing: boolean): boolean {
   let bit = false;
 
-  switch (wormAi.mode) {
+  switch (agent.mode) {
+    case "dead": {
+      agent.respawnTimer -= delta;
+      if (agent.respawnTimer <= 0) {
+        agent.hp = WORM_MAX_HP;
+        agent.position.set(agent.territory.x, 0, agent.territory.z);
+        agent.mode = "patrol";
+        pickPatrolTarget(agent);
+      }
+      break;
+    }
     case "patrol": {
-      wormAi.patrolTimer -= delta;
-      const dx = wormAi.patrolTargetX - wormAi.position.x;
-      const dz = wormAi.patrolTargetZ - wormAi.position.z;
-      if (wormAi.patrolTimer <= 0 || Math.hypot(dx, dz) < 30) pickPatrolTarget();
-      moveToward(wormAi.patrolTargetX, wormAi.patrolTargetZ, PATROL_SPEED, 1.2, delta);
-      if (sailing && shipDistanceToCenter() < TERRITORY_RADIUS && shipDistanceToWorm() < AGGRO_RANGE) {
-        wormAi.mode = "chase";
+      agent.patrolTimer -= delta;
+      const dx = agent.patrolTargetX - agent.position.x;
+      const dz = agent.patrolTargetZ - agent.position.z;
+      if (agent.patrolTimer <= 0 || Math.hypot(dx, dz) < 30) pickPatrolTarget(agent);
+      moveToward(agent, agent.patrolTargetX, agent.patrolTargetZ, PATROL_SPEED, 1.2, delta);
+      if (targetDistanceToWorm(agent, sailing) < ATTACK_RANGE) {
+        agent.mode = "chase";
       }
       break;
     }
     case "chase": {
-      if (!sailing || shipDistanceToCenter() > LEASH_RADIUS || shipDistanceToWorm() > DROP_RANGE) {
-        wormAi.mode = "return";
+      // 目标跑出攻击圈、或沙虫被拖离领地太远（拴绳）才收手
+      if (targetDistanceToWorm(agent, sailing) > ATTACK_RANGE || wormDistanceToHome(agent) > agent.territory.leash) {
+        agent.mode = "return";
         break;
       }
-      moveToward(shipState.position.x, shipState.position.z, CHASE_SPEED, CHASE_TURN_RATE, delta);
-      if (shipDistanceToWorm() < BITE_RANGE) {
+      const target = targetPosition(sailing);
+      // 近身自适应转向：保证转弯半径 ≤ 0.45×目标距离，否则绕着站定目标
+      // （如步行角色）打转永远咬不到；攻击圈边缘仍是 0.55 上限，可蛇形甩位
+      const distance = targetDistanceToWorm(agent, sailing);
+      const turnRate = Math.max(CHASE_TURN_RATE, CHASE_SPEED / Math.max(distance * 0.45, 12));
+      moveToward(agent, target.x, target.z, CHASE_SPEED, turnRate, delta);
+      if (targetDistanceToWorm(agent, sailing) < BITE_RANGE) {
         setState(applyWormBite(getState(), BITE_DAMAGE));
         bit = true;
-        wormAi.mode = "bite";
-        wormAi.biteTimer = BITE_DURATION;
+        agent.mode = "bite";
+        agent.biteTimer = BITE_DURATION;
       }
       break;
     }
     case "bite": {
-      wormAi.biteTimer -= delta;
-      if (wormAi.biteTimer <= 0) {
-        wormAi.mode = "dive";
-        wormAi.diveTimer = DIVE_DURATION;
+      agent.biteTimer -= delta;
+      if (agent.biteTimer <= 0) {
+        agent.mode = "dive";
+        agent.diveTimer = DIVE_DURATION;
       }
       break;
     }
     case "dive": {
-      // 沉沙 3 秒：不移动不攻击，玩家的逃跑窗口
-      wormAi.diveTimer -= delta;
-      if (wormAi.diveTimer <= 0) {
-        wormAi.mode =
-          sailing && shipDistanceToCenter() < TERRITORY_RADIUS ? "chase" : "return";
+      // 沉沙 3 秒：不移动不攻击，玩家的逃跑窗口；结束时目标仍在攻击圈内就继续追
+      agent.diveTimer -= delta;
+      if (agent.diveTimer <= 0) {
+        agent.mode = targetDistanceToWorm(agent, sailing) < ATTACK_RANGE ? "chase" : "return";
       }
       break;
     }
     case "return": {
-      moveToward(TERRITORY_X, TERRITORY_Z, RETURN_SPEED, 1.2, delta);
-      if (Math.hypot(wormAi.position.x - TERRITORY_X, wormAi.position.z - TERRITORY_Z) < 200) {
-        wormAi.mode = "patrol";
-        pickPatrolTarget();
+      moveToward(agent, agent.territory.x, agent.territory.z, RETURN_SPEED, 1.2, delta);
+      const homeDistance = wormDistanceToHome(agent);
+      // 归途中撞见圈内目标（且已回到领地内）就重新开咬
+      if (homeDistance < agent.territory.radius && targetDistanceToWorm(agent, sailing) < ATTACK_RANGE) {
+        agent.mode = "chase";
+        break;
+      }
+      if (homeDistance < 200) {
+        agent.mode = "patrol";
+        pickPatrolTarget(agent);
       }
       break;
     }
   }
 
+  return bit;
+}
+
+// 每帧驱动全部沙虫；返回本帧是否有咬击命中（main 做受击反馈）
+export function updateWormAi(delta: number, sailing: boolean): boolean {
+  let bit = false;
+  for (const agent of wormAgents) {
+    if (updateAgent(agent, delta, sailing)) bit = true;
+  }
   return bit;
 }

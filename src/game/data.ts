@@ -127,7 +127,44 @@ export interface GameState {
   readonly cratesBroken: number;
   readonly bitesSurvived: number;
   readonly claimedQuests: readonly string[];
+  // 鱼叉炮（击杀沙虫的门槛）与猎杀战绩
+  readonly harpoon: boolean;
+  readonly wormKills: number;
+  // 船长外观（更衣室）
+  readonly outfit: OutfitState;
 }
+
+// 鱼叉炮与猎杀沙虫（击杀门槛=先在船坞购置鱼叉炮）
+export const HARPOON_COST = 600;
+export const HARPOON_DAMAGE = 20;
+export const HARPOON_RANGE = 230;
+export const HARPOON_COOLDOWN = 1.1;
+export const WORM_MAX_HP = 120;
+export const WORM_BOUNTY = 150;
+export const WORM_RESPAWN_SECONDS = 90;
+
+// 更衣室：三个可染色槽位，颜色为 hex（存档持久化）
+export interface OutfitState {
+  readonly bandana: string;
+  readonly cloth: string;
+  readonly leather: string;
+}
+
+export const OUTFIT_DEFAULT: OutfitState = {
+  bandana: "#a72f32",
+  cloth: "#3fa8a0",
+  leather: "#8a5431",
+};
+
+// 更衣室色板（三槽共用六色）
+export const OUTFIT_COLORS: readonly string[] = [
+  "#a72f32", // 私掠红
+  "#3fa8a0", // 风化青
+  "#33465d", // 沙暴靛
+  "#c9973e", // 黄铜金
+  "#5b4a38", // 旧皮棕
+  "#e7debd", // 盐白
+];
 
 export const TREASURE_MAP_COST = 1500;
 export const TREASURE_REWARD = 5000;
@@ -159,6 +196,9 @@ export function createInitialState(): GameState {
     cratesBroken: 0,
     bitesSurvived: 0,
     claimedQuests: [],
+    harpoon: false,
+    wormKills: 0,
+    outfit: OUTFIT_DEFAULT,
   };
 }
 

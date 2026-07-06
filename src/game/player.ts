@@ -3,6 +3,8 @@ import { isDown, consumePressed, getStick } from "../core/input";
 import { surfaceHeight } from "../world/sand";
 import { loadRiggedModel, fitRiggedToPlaceholder } from "../core/models";
 import { createVoxelAsset } from "../voxel-assets";
+import type { OutfitState } from "./data";
+import { OUTFIT_DEFAULT } from "./data";
 
 export type PlayerState = {
   position: THREE.Vector3;
@@ -39,6 +41,44 @@ const actions: Record<string, THREE.AnimationAction> = {};
 let currentAction = "";
 let riggedModel: THREE.Object3D | null = null;
 let needsReground = false;
+
+// ===== 更衣室：按材质名染色（H01 的材质分组命名是这套系统的地基）=====
+// 槽位→材质名映射；shadow 材质取主色的 0.72 暗部
+const OUTFIT_SLOT_MATERIALS: Record<keyof OutfitState, { main: string[]; shadow: string[] }> = {
+  bandana: { main: ["h01_privateer_red"], shadow: [] },
+  cloth: { main: ["h01_weathered_teal_cloth"], shadow: ["h01_dark_teal_shadow"] },
+  leather: { main: ["h01_sun_dark_leather"], shadow: [] },
+};
+
+const outfitMaterials = new Map<string, THREE.Material & { color: THREE.Color }>();
+let pendingOutfit: OutfitState = OUTFIT_DEFAULT;
+
+function collectOutfitMaterials(model: THREE.Object3D) {
+  model.traverse((child) => {
+    const mesh = child as THREE.SkinnedMesh;
+    if (!mesh.isSkinnedMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (material?.name) outfitMaterials.set(material.name, material as THREE.Material & { color: THREE.Color });
+    }
+  });
+}
+
+// 应用船长外观：模型未加载时先记下，加载完成后补涂
+export function applyOutfit(outfit: OutfitState) {
+  pendingOutfit = outfit;
+  if (outfitMaterials.size === 0) return;
+  for (const slot of Object.keys(OUTFIT_SLOT_MATERIALS) as (keyof OutfitState)[]) {
+    const color = new THREE.Color(outfit[slot]);
+    const mapping = OUTFIT_SLOT_MATERIALS[slot];
+    for (const name of mapping.main) {
+      outfitMaterials.get(name)?.color.copy(color);
+    }
+    for (const name of mapping.shadow) {
+      outfitMaterials.get(name)?.color.copy(color).multiplyScalar(0.72);
+    }
+  }
+}
 
 // 绑定姿态与动画姿态的脚底高度不同——首帧动画应用后按"实际姿态"包围盒重新贴地
 function regroundRigged() {
@@ -84,6 +124,8 @@ export function createPlayerAvatar() {
       rig.add(model);
       riggedModel = model;
       needsReground = true;
+      collectOutfitMaterials(model);
+      applyOutfit(pendingOutfit);
       mixer = new THREE.AnimationMixer(model);
       for (const clip of animations) {
         actions[clip.name] = mixer.clipAction(clip);
