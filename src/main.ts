@@ -48,10 +48,11 @@ import { initMinimap, updateMinimap } from "./ui/minimap";
 import { showModal, isModalOpen } from "./ui/modal";
 import { getState, setState, subscribe, resetState } from "./game/store";
 import * as economy from "./game/economy";
-import { addGold, applyStranding, recordVisit, openTreasure, findPort } from "./game/economy";
+import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, dockAt, undock } from "./game/economy";
 import { updateWormAi, wormAi } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
-import { PORTS, TREASURE_X, TREASURE_Z, TREASURE_REWARD, STRAND_TOW_FEE } from "./game/data";
+import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
+import { PORTS, TREASURE_X, TREASURE_Z, TREASURE_REWARD, STRAND_TOW_FEE, DOCK_RADIUS } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
@@ -159,7 +160,26 @@ function setAction(text: string | null) {
   }
 }
 
+const dockProbe = new THREE.Vector3();
+
+function findDockedPort() {
+  for (const port of PORTS) {
+    dockProbe.set(port.x, shipState.position.y, port.z);
+    if (shipState.position.distanceTo(dockProbe) < DOCK_RADIUS) return port;
+  }
+  return null;
+}
+
 function goAshore() {
+  const dock = findDockedPort();
+  if (dock) {
+    const beforeHull = getState().hull;
+    setState(recordVisit(dockAt(getState(), dock.id), dock.id));
+    if (getState().hull > beforeHull) {
+      showToast(`Hull repaired at ${dock.name}`);
+      postChat("Shipwright", `Hull patched and ready at ${dock.name}.`);
+    }
+  }
   mode = "walking";
   playerState.position.set(
     shipState.position.x + Math.cos(shipState.heading) * 36,
@@ -174,6 +194,7 @@ function goAshore() {
 function boardShip() {
   mode = "sailing";
   player.visible = false;
+  setState(undock(getState()));
   save(getState(), shipSnapshot());
 }
 
@@ -278,7 +299,7 @@ function tryBreakCrates() {
     if (crateWorldPos.distanceTo(hitProbe) < 24) {
       crate.visible = false;
       spawnSplinters(crateWorldPos);
-      setState(addGold(getState(), 2));
+      setState(recordCrateBreak(getState()));
     }
   }
 }
@@ -308,19 +329,32 @@ function updateCameraOrbit() {
   cameraOrbit.pitch = THREE.MathUtils.clamp(cameraOrbit.pitch + drag.dy * 0.004, -0.18, 0.6);
 }
 
-// 存档：启动恢复，之后每次状态变更（交易/劈箱等离散事件）自动写入
-const savedGame = load();
-if (savedGame) {
-  resetState(savedGame.state);
-  shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
-  shipState.heading = savedGame.ship.heading;
-}
-
 function shipSnapshot() {
   return { x: shipState.position.x, z: shipState.position.z, heading: shipState.heading };
 }
 
-subscribe((state) => save(state, shipSnapshot()));
+// 启动流程：先解析钱包身份（登录门）→ 载入该身份的存档 → 起引擎。
+// 存档按钱包隔离；之后每次状态变更（交易/任务奖励等离散事件）自动写入。
+function startGame() {
+  const savedGame = load();
+  if (savedGame) {
+    resetState(savedGame.state);
+    shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
+    shipState.heading = savedGame.ship.heading;
+  }
+  subscribe((state) => save(state, shipSnapshot()));
+
+  if (isWalletLinked()) {
+    const eyebrow = document.querySelector(".brand-title .eyebrow");
+    if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
+    postChat("Harbormaster", `Wallet linked: ${shortIdentity()}. Your voyage is bound to it.`);
+  }
+
+  renderer.setAnimationLoop(() => {
+    animate();
+    removeBootOverlay();
+  });
+}
 
 // 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
 if (import.meta.env.DEV) {
@@ -455,7 +489,4 @@ function removeBootOverlay() {
   }
 }
 
-renderer.setAnimationLoop(() => {
-  animate();
-  removeBootOverlay();
-});
+resolveIdentity().then(startGame);

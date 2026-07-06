@@ -1,7 +1,11 @@
 import type { GameState } from "./data";
 import { createInitialState } from "./data";
+import { getIdentity } from "../core/wallet";
 
-const SAVE_KEY = "sandsea-save";
+// 存档按钱包身份隔离：每个钱包一份进度，访客用本机 guest 档
+function saveKey() {
+  return `sandsea-save:${getIdentity()}`;
+}
 const SAVE_VERSION = 1;
 
 export interface SaveFileV1 {
@@ -20,7 +24,7 @@ export function save(state: GameState, ship: { x: number; z: number; heading: nu
       ship,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(file));
+    localStorage.setItem(saveKey(), JSON.stringify(file));
   } catch (error) {
     console.error("存档写入失败", error);
   }
@@ -29,7 +33,7 @@ export function save(state: GameState, ship: { x: number; z: number; heading: nu
 // version 不匹配直接弃档重开（原型期合法），缺字段用初始值兜底
 export function load(): SaveFileV1 | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(saveKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<SaveFileV1>;
     if (parsed?.version !== SAVE_VERSION || !parsed.state || !parsed.ship) return null;
@@ -53,5 +57,5 @@ export function load(): SaveFileV1 | null {
 }
 
 export function clearSave() {
-  localStorage.removeItem(SAVE_KEY);
+  localStorage.removeItem(saveKey());
 }

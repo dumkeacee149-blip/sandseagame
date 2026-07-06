@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sandsea Privateers — Sail. Trade. Survive. Claim.</title>
+    <meta
+      name="description"
+      content="A voxel desert-pirate trading adventure in your browser. Run trade routes across the sand sea, outfit your skiff, outrun the leviathan — and bind your voyage to your Solana wallet."
+    />
+    <meta property="og:title" content="Sandsea Privateers" />
+    <meta property="og:description" content="Sail. Trade. Survive. Claim. A voxel sand-sea adventure in your browser." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      /* 官网自包含样式：与游戏同一"船长的航海桌"语言 */
+      @font-face {
+        font-family: "Pirata One";
+        src: url("/fonts/pirata-one.woff2") format("woff2");
+        font-display: swap;
+      }
+      :root {
+        --ink: #241708;
+        --wood: #3a2817;
+        --wood-deep: #2b1d10;
+        --parchment: #efe3c2;
+        --parchment-ink: #4a3416;
+        --brass: #c9973e;
+        --brass-bright: #ecc06a;
+        --brass-dim: rgba(201, 151, 62, 0.55);
+        --cream: #f6ecd2;
+        --display: "Pirata One", Georgia, serif;
+        --body: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: var(--body);
+        background: var(--wood-deep);
+        color: var(--cream);
+      }
+      .plaque {
+        background:
+          repeating-linear-gradient(94deg, rgba(255, 226, 166, 0.05) 0 2px, transparent 2px 7px),
+          linear-gradient(172deg, rgba(74, 51, 28, 0.96), rgba(43, 29, 16, 0.96));
+        border: 2px solid var(--brass-dim);
+        border-radius: 8px;
+        box-shadow: inset 0 0 0 1px rgba(24, 14, 5, 0.9), 0 10px 28px rgba(15, 8, 2, 0.5);
+      }
+      .btn {
+        display: inline-block;
+        padding: 14px 38px;
+        border: 1px solid rgba(24, 14, 5, 0.85);
+        border-radius: 7px;
+        background: linear-gradient(178deg, var(--brass-bright), var(--brass) 55%, #a4762c);
+        color: var(--ink);
+        font-family: var(--display);
+        font-size: 1.3rem;
+        letter-spacing: 0.05em;
+        text-decoration: none;
+        box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.75), 0 4px 0 rgba(24, 14, 5, 0.7);
+      }
+      .btn:hover { filter: brightness(1.08); }
+      .btn:active { translate: 0 2px; box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.75), 0 2px 0 rgba(24, 14, 5, 0.7); }
+      .btn-ghost {
+        background: rgba(36, 23, 8, 0.6);
+        color: var(--cream);
+        border-color: var(--brass-dim);
+        font-size: 1rem;
+        padding: 12px 26px;
+      }
+
+      /* 顶部导航 */
+      nav {
+        position: fixed;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(1060px, calc(100vw - 28px));
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 10px 18px;
+        z-index: 10;
+      }
+      nav .wordmark { font-family: var(--display); font-size: 1.3rem; color: var(--cream); text-decoration: none; }
+      nav .tag { font-size: 0.6rem; letter-spacing: 0.16em; color: var(--brass-bright); border: 1px solid var(--brass-dim); border-radius: 99px; padding: 2px 8px; }
+      nav .links { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+      nav .links a { color: rgba(246, 236, 210, 0.8); text-decoration: none; font-size: 0.88rem; }
+      nav .links a:hover { color: var(--brass-bright); }
+      nav .play { font-family: var(--display); background: linear-gradient(178deg, var(--brass-bright), var(--brass)); color: var(--ink); padding: 8px 20px; border-radius: 6px; text-decoration: none; box-shadow: 0 3px 0 rgba(24,14,5,0.7); }
+
+      /* 英雄区：满屏游戏实景 */
+      header {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 90px 20px 60px;
+        background: url("/landing/hero.jpg") center / cover no-repeat;
+      }
+      header::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 90% 60% at 50% 42%, rgba(20, 12, 5, 0.18), rgba(20, 12, 5, 0.72) 90%);
+      }
+      header > * { position: relative; }
+      h1 {
+        margin: 0;
+        font-family: var(--display);
+        font-weight: 400;
+        font-size: clamp(3rem, 9vw, 6.4rem);
+        line-height: 0.95;
+        letter-spacing: 0.04em;
+        text-shadow: 0 4px 0 rgba(24, 14, 5, 0.85), 0 14px 40px rgba(15, 8, 2, 0.8);
+      }
+      .tagline {
+        margin: 18px auto 30px;
+        max-width: 560px;
+        font-size: clamp(0.95rem, 2vw, 1.12rem);
+        line-height: 1.6;
+        color: rgba(246, 236, 210, 0.92);
+        text-shadow: 0 1px 4px rgba(15, 8, 2, 0.9);
+      }
+      .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+      .pills { margin-top: 30px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .pill {
+        padding: 7px 16px;
+        border-radius: 99px;
+        background: rgba(36, 23, 8, 0.72);
+        border: 1px solid var(--brass-dim);
+        font-size: 0.78rem;
+        color: rgba(246, 236, 210, 0.85);
+      }
+      .pill b { color: var(--brass-bright); }
+      .ca-pill { margin-top: 12px; font-size: 0.72rem; font-family: ui-monospace, monospace; color: rgba(246, 236, 210, 0.55); }
+
+      /* 章节 */
+      section { padding: 76px 20px; }
+      .wrap { max-width: 1020px; margin: 0 auto; }
+      h2 {
+        margin: 0 0 34px;
+        font-family: var(--display);
+        font-weight: 400;
+        font-size: clamp(1.8rem, 4vw, 2.6rem);
+        letter-spacing: 0.04em;
+        text-align: center;
+        color: var(--brass-bright);
+      }
+      .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+      .step {
+        padding: 22px 20px;
+        background: linear-gradient(174deg, var(--parchment), #e2d2a8);
+        color: var(--parchment-ink);
+        border-radius: 4px;
+        clip-path: polygon(0 3%, 6% 0, 50% 1.5%, 94% 0, 100% 3%, 99% 97%, 94% 100%, 50% 98.5%, 6% 100%, 1% 97%);
+      }
+      .step b { display: block; font-family: var(--display); font-weight: 400; font-size: 1.25rem; margin-bottom: 8px; color: #6b4a1c; }
+      .step p { margin: 0; font-size: 0.88rem; line-height: 1.55; }
+      .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      .feature { padding: 22px 20px; }
+      .feature b { display: block; font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--brass-bright); margin-bottom: 8px; }
+      .feature p { margin: 0; font-size: 0.85rem; line-height: 1.55; color: rgba(246, 236, 210, 0.78); }
+
+      /* 代币区 */
+      .token { text-align: center; }
+      .token-line { max-width: 620px; margin: 0 auto 26px; font-size: 0.95rem; line-height: 1.65; color: rgba(246, 236, 210, 0.85); }
+      .token-flow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 26px; }
+      .token-flow .pill { font-size: 0.85rem; }
+      .disclaimer { max-width: 640px; margin: 0 auto; font-size: 0.72rem; line-height: 1.6; color: rgba(246, 236, 210, 0.45); }
+
+      footer { padding: 34px 20px 44px; text-align: center; font-size: 0.78rem; color: rgba(246, 236, 210, 0.5); }
+      footer a { color: var(--brass); }
+    </style>
+  </head>
+  <body>
+    <nav class="plaque">
+      <a class="wordmark" href="/landing.html">Sandsea Privateers</a>
+      <span class="tag">ALPHA</span>
+      <div class="links">
+        <a href="#how">How to Play</a>
+        <a href="#token">$SAND</a>
+        <a class="play" href="/">Play Now</a>
+      </div>
+    </nav>
+
+    <header>
+      <h1>SANDSEA<br />PRIVATEERS</h1>
+      <p class="tagline">
+        A voxel desert where the ocean turned to sand. Run trade routes between oasis ports,
+        outfit your skiff, outrun the leviathan — and claim the relic vault. Right in your browser.
+      </p>
+      <div class="cta-row">
+        <a class="btn" href="/">⚓ Play Now</a>
+        <a class="btn btn-ghost" href="#how">Read the Log</a>
+      </div>
+      <div class="pills">
+        <span class="pill"><b>Browser</b> · no download</span>
+        <span class="pill"><b>Wallet-linked</b> voyages · Solana</span>
+        <span class="pill"><b>$SAND</b> · pre-launch</span>
+      </div>
+      <p class="ca-pill">CA: announced at token launch — beware of imitations</p>
+    </header>
+
+    <section id="how">
+      <div class="wrap">
+        <h2>Chart Your First Voyage</h2>
+        <div class="steps">
+          <div class="step">
+            <b>1 · Link &amp; Sail</b>
+            <p>Connect your Solana wallet — it is your captain's identity, and your voyage saves to it. Then take the helm: WASD to sail, E to go ashore.</p>
+          </div>
+          <div class="step">
+            <b>2 · Trade &amp; Outfit</b>
+            <p>Dates buy cheap at the Oasis, sell sweet at Saltcrest. Every quest pays gold; every profit funds sails, cargo holds and hull at the shipwright.</p>
+          </div>
+          <div class="step">
+            <b>3 · Risk &amp; Claim</b>
+            <p>The far route to Duneskull pays triple — through leviathan territory. Survive it, buy the map, open the relic vault, and swap gold for $SAND.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Life on the Sandsea</h2>
+        <div class="features">
+          <div class="feature plaque">
+            <b>Trade Routes</b>
+            <p>Three ports, four goods, honest price gaps. Near routes pay steady; far routes pay bold captains.</p>
+          </div>
+          <div class="feature plaque">
+            <b>The Shipwright</b>
+            <p>Sails, cargo hold, hull — three upgrade paths. Sail L2 is the line where you outrun the beast.</p>
+          </div>
+          <div class="feature plaque">
+            <b>The Leviathan</b>
+            <p>It patrols the deep sand between you and the richest spice run. It bites, you lose cargo. Plan around it — or through it.</p>
+          </div>
+          <div class="feature plaque">
+            <b>The Relic Vault</b>
+            <p>A map sold only at the most dangerous outpost leads to the vault beneath the Sunken Ruins. Legends retire rich.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="token">
+      <div class="wrap token">
+        <h2>Gold Today, $SAND at Launch</h2>
+        <p class="token-line">
+          Everything you earn in the game is gold. At any market's Token Vault you can exchange gold into the
+          $SAND ledger bound to your wallet. When the token launches on Solana, ledger balances settle on-chain.
+        </p>
+        <div class="token-flow">
+          <span class="pill">Earn gold by quests &amp; trade</span>
+          <span class="pill">→ Exchange at the Token Vault</span>
+          <span class="pill">→ Settles on-chain at launch</span>
+        </div>
+        <p class="disclaimer">
+          $SAND is a planned in-game utility token on Solana. Pre-launch ledger balances are game records, not
+          on-chain assets, and carry no guarantee of value. Nothing on this page is financial advice. Terms,
+          supply and contract address will be published at launch — trust only addresses announced here.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      Sandsea Privateers — hand-built voxel world, sailed by captains like you. <a href="/">Set sail</a>.
+    </footer>
+  </body>
+</html>

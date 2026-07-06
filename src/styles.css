@@ -745,7 +745,12 @@ h1 {
 
 .touch-button-action {
   right: 26px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(150px + env(safe-area-inset-bottom));
+}
+
+.touch-button-attack {
+  right: 26px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
 }
 
 .touch-button-jump {
@@ -753,10 +758,28 @@ h1 {
   bottom: calc(30px + env(safe-area-inset-bottom));
 }
 
-/* 触屏模式下聊天上移让位给摇杆，操作提示隐藏 */
+/* 触屏模式下把信息层抬离底部操作区 */
 .touch-mode .chat-panel {
-  bottom: 150px;
-  width: min(280px, 46vw);
+  display: none;
+}
+
+.touch-mode .route-chip {
+  position: fixed;
+  top: calc(124px + env(safe-area-inset-top));
+  left: 14px;
+  right: 14px;
+  justify-content: center;
+  max-width: none;
+  z-index: 11;
+}
+
+.touch-mode .action-chip {
+  bottom: calc(224px + env(safe-area-inset-bottom));
+  max-width: calc(100vw - 48px);
+  padding: 8px 18px 9px;
+  text-align: center;
+  font-size: 0.98rem;
+  white-space: normal;
 }
 
 .touch-mode .controls-hint {
@@ -783,4 +806,73 @@ h1 {
   .stat-chip b {
     font-size: 1.05rem;
   }
+}
+
+/* ---------- 钱包登录门 ---------- */
+.wallet-gate {
+  position: fixed;
+  inset: 0;
+  /* 必须盖过 #boot-overlay(99)：在 Loading 暖色底之上弹登录门 */
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 12, 5, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.wallet-card {
+  width: min(400px, calc(100vw - 40px));
+  padding: 26px 28px;
+  text-align: center;
+  color: var(--cream);
+  background:
+    repeating-linear-gradient(94deg, rgba(255, 226, 166, 0.05) 0 2px, transparent 2px 7px),
+    linear-gradient(172deg, rgba(74, 51, 28, 0.98), rgba(43, 29, 16, 0.98));
+  border: 2px solid var(--brass-dim);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 1px rgba(24, 14, 5, 0.9),
+    0 18px 44px rgba(15, 8, 2, 0.6);
+}
+
+.wallet-title {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+}
+
+.wallet-line {
+  margin: 12px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: rgba(246, 236, 210, 0.75);
+}
+
+.wallet-guest-line {
+  font-size: 0.75rem;
+  color: rgba(246, 236, 210, 0.5);
+}
+
+.wallet-guest-line a {
+  color: var(--brass-bright);
+}
+
+/* ---------- 任务奖励徽标 ---------- */
+.quest-reward {
+  font-style: normal;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #8a6420;
+  white-space: nowrap;
+}
+
+.quest-count {
+  float: right;
+  font-family: var(--body);
+  font-size: 0.72rem;
+  color: rgba(107, 74, 28, 0.7);
 }

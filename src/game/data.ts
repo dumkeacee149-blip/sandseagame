@@ -66,7 +66,9 @@ export const PORTS: readonly PortDef[] = [
 
 export const PROMPT_RADIUS = 200;
 export const DOCK_RADIUS = 130;
-export const START_GOLD = 60;
+export const START_GOLD = 0;
+// 金币兑换代币汇率（预发布记账；$SAND 上线后接链上结算）
+export const TOKEN_RATE = 1000;
 
 // 升级查表（不用公式派生：帆速 92/106/122/140 是沙虫追速 110 的分水岭设计）
 export interface UpgradeTier {
@@ -118,6 +120,13 @@ export interface GameState {
   readonly completed: boolean;
   // 累计成交笔数（买+卖各算一笔）：任务链的进度依据
   readonly trades: number;
+  // 预发布代币记账（$SAND on Solana，TGE 后接链上）
+  readonly tokens: number;
+  // 任务系统的进度统计
+  readonly visited: readonly PortId[];
+  readonly cratesBroken: number;
+  readonly bitesSurvived: number;
+  readonly claimedQuests: readonly string[];
 }
 
 export const TREASURE_MAP_COST = 1500;
@@ -145,6 +154,11 @@ export function createInitialState(): GameState {
     mapPurchased: false,
     completed: false,
     trades: 0,
+    tokens: 0,
+    visited: [],
+    cratesBroken: 0,
+    bitesSurvived: 0,
+    claimedQuests: [],
   };
 }
 

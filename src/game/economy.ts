@@ -5,6 +5,7 @@ import {
   STRAND_TOW_FEE,
   TREASURE_MAP_COST,
   TREASURE_REWARD,
+  TOKEN_RATE,
   cargoCapacity,
   cargoCount,
   maxHull,
@@ -98,9 +99,10 @@ export function applyHullDamage(state: GameState, damage: number): GameState {
   return { ...state, hull: Math.max(0, state.hull - damage) };
 }
 
-// 沙虫咬击：扣船壳 + 掉 25% 载货
+// 沙虫咬击：扣船壳 + 掉 25% 载货 + 幸存计数
 export function applyWormBite(state: GameState, damage: number): GameState {
-  return loseCargo(applyHullDamage(state, damage), 0.25);
+  const bitten = loseCargo(applyHullDamage(state, damage), 0.25);
+  return { ...bitten, bitesSurvived: bitten.bitesSurvived + 1 };
 }
 
 // 搁浅：掉 50% 货 + 拖船费，满耐久在最后交易港重生（金币只扣到 0 不为负）
@@ -115,8 +117,25 @@ export function applyStranding(state: GameState): GameState {
 }
 
 export function recordVisit(state: GameState, portId: PortId): GameState {
-  if (state.lastPort === portId) return state;
-  return { ...state, lastPort: portId };
+  const seen = state.visited.includes(portId);
+  if (state.lastPort === portId && seen) return state;
+  return {
+    ...state,
+    lastPort: portId,
+    visited: seen ? state.visited : [...state.visited, portId],
+  };
+}
+
+// 劈碎货箱：+2 金并计数（任务进度）
+export function recordCrateBreak(state: GameState): GameState {
+  return { ...state, gold: state.gold + 2, cratesBroken: state.cratesBroken + 1 };
+}
+
+// 金币→$SAND 兑换（预发布记账）
+export function exchangeTokens(state: GameState, count: number): GameState {
+  const cost = count * TOKEN_RATE;
+  if (count <= 0 || state.gold < cost) return state;
+  return { ...state, gold: state.gold - cost, tokens: state.tokens + count };
 }
 
 export function buyTreasureMap(state: GameState): GameState {

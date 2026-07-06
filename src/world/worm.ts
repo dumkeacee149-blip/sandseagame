@@ -40,6 +40,10 @@ export function createWorm() {
       for (const clip of animations) {
         wormActions[clip.name] = wormMixer.clipAction(clip);
       }
+      if (wormActions.Bite) {
+        wormActions.Bite.setLoop(THREE.LoopOnce, 1);
+        wormActions.Bite.clampWhenFinished = true;
+      }
       playWormAction("Swim");
     })
     .catch((error) => {
@@ -67,28 +71,27 @@ export function updateWorm(rig: THREE.Group, elapsed: number, delta: number) {
   rig.position.z = wormAi.position.z;
   rig.rotation.y = wormAi.heading;
 
-  // 骨骼动画随 AI 状态：追击/巡逻=Swim，下潜=Burrow；Bite 由咬击瞬间触发更自然，
-  // 但 dive 前的一帧就是命中帧，用 Burrow 入沙代替收尾，Bite 留给未来受击特写
+  // 骨骼动画随 AI 状态：咬击=Bite，追击/巡逻=Swim，下潜=Burrow。
   if (wormMixer) {
     wormMixer.update(delta);
-    playWormAction(wormAi.mode === "dive" ? "Burrow" : "Swim");
+    playWormAction(wormAi.mode === "bite" ? "Bite" : wormAi.mode === "dive" ? "Burrow" : "Swim");
   }
 
   // 下潜量按 AI 状态：dive 全潜（逃跑窗口），chase 半露冲刺，patrol/return 浮游
   const targetSink =
-    wormAi.mode === "dive" ? 30 : wormAi.mode === "chase" ? 6 : 3;
-  const bob = Math.sin(elapsed * (wormAi.mode === "chase" ? 3.2 : 1.6)) * 3;
+    wormAi.mode === "dive" ? 30 : wormAi.mode === "chase" || wormAi.mode === "bite" ? 6 : 3;
+  const bob = Math.sin(elapsed * (wormAi.mode === "chase" || wormAi.mode === "bite" ? 3.2 : 1.6)) * 3;
   rig.position.y = sandHeight(rig.position.x, rig.position.z) + bob - targetSink;
 
   // 游动的波浪姿态：追击时更凶
-  const intensity = wormAi.mode === "chase" ? 2 : 1;
+  const intensity = wormAi.mode === "chase" || wormAi.mode === "bite" ? 2 : 1;
   rig.rotation.x = Math.sin(elapsed * 2.1 * intensity) * 0.1 * intensity;
   rig.rotation.z = Math.sin(elapsed * 1.3) * 0.06;
 
   // 沙尘环：贴着沙面翻滚；追击/下潜时更剧烈（土里有东西在动）
   const dust = rig.getObjectByName("worm-dust");
   if (dust) {
-    const lively = wormAi.mode === "chase" ? 2.2 : wormAi.mode === "dive" ? 2.6 : 1;
+    const lively = wormAi.mode === "chase" || wormAi.mode === "bite" ? 2.2 : wormAi.mode === "dive" ? 2.6 : 1;
     dust.rotation.y = -rig.rotation.y + elapsed * 0.7 * lively;
     dust.position.y = -rig.position.y + sandHeight(rig.position.x, rig.position.z) + 2;
     dust.children.forEach((chunk, index) => {

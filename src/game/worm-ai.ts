@@ -6,7 +6,7 @@ import { applyWormBite } from "./economy";
 // 沙虫 AI 状态机（数值来自 plan §2 的分水岭设计）：
 // 追速 110 卡在帆 L1(106) 与 L2(122) 之间——L1 逃不掉，L2 起正面跑赢；
 // 转向上限 0.55 rad/s 低于船的 0.60，蛇形走位可甩位。
-export type WormAiMode = "patrol" | "chase" | "dive" | "return";
+export type WormAiMode = "patrol" | "chase" | "bite" | "dive" | "return";
 
 const TERRITORY_X = 760;
 const TERRITORY_Z = -680;
@@ -20,6 +20,7 @@ const RETURN_SPEED = 60;
 const CHASE_TURN_RATE = 0.55;
 const BITE_RANGE = 40;
 const BITE_DAMAGE = 35;
+const BITE_DURATION = 0.55;
 const DIVE_DURATION = 3;
 
 export const wormAi = {
@@ -29,6 +30,7 @@ export const wormAi = {
   patrolTargetX: TERRITORY_X,
   patrolTargetZ: TERRITORY_Z,
   patrolTimer: 0,
+  biteTimer: 0,
   diveTimer: 0,
 };
 
@@ -86,6 +88,14 @@ export function updateWormAi(delta: number, sailing: boolean): boolean {
       if (shipDistanceToWorm() < BITE_RANGE) {
         setState(applyWormBite(getState(), BITE_DAMAGE));
         bit = true;
+        wormAi.mode = "bite";
+        wormAi.biteTimer = BITE_DURATION;
+      }
+      break;
+    }
+    case "bite": {
+      wormAi.biteTimer -= delta;
+      if (wormAi.biteTimer <= 0) {
         wormAi.mode = "dive";
         wormAi.diveTimer = DIVE_DURATION;
       }

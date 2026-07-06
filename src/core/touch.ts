@@ -1,4 +1,4 @@
-import { setVirtualStick, injectPress } from "./input";
+import { setVirtualStick, injectPress, injectClick } from "./input";
 
 // 触屏控制：零依赖虚拟摇杆 + 动作/跳跃按钮（Pointer Events）。
 // 仅在触屏设备启用；?touch=1 可在桌面强开调试。
@@ -59,18 +59,21 @@ export function initTouchControls() {
   pad.addEventListener("pointerup", releaseStick);
   pad.addEventListener("pointercancel", releaseStick);
 
-  // 动作按钮：右下角（E=互动 / 跳跃）
-  const makeButton = (label: string, className: string, code: string) => {
+  // 动作按钮：右下角（E=互动 / 攻击 / 跳跃）
+  const makeButton = (label: string, className: string, ariaLabel: string, onPress: () => void) => {
     const button = document.createElement("button");
+    button.type = "button";
     button.className = `touch-button ${className}`;
     button.textContent = label;
+    button.setAttribute("aria-label", ariaLabel);
     button.addEventListener("pointerdown", (event) => {
       event.preventDefault();
-      injectPress(code);
+      onPress();
     });
     document.body.appendChild(button);
     return button;
   };
-  makeButton("E", "touch-button-action", "KeyE");
-  makeButton("▲", "touch-button-jump", "Space");
+  makeButton("E", "touch-button-action", "Interact", () => injectPress("KeyE"));
+  makeButton("⚔", "touch-button-attack", "Attack", injectClick);
+  makeButton("▲", "touch-button-jump", "Jump", () => injectPress("Space"));
 }

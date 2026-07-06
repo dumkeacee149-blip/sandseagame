@@ -44,6 +44,11 @@ export function injectPress(code: string) {
   pressed.add(code);
 }
 
+// 触控攻击按钮注入一次左键点击，复用步行攻击/劈箱逻辑。
+export function injectClick() {
+  clickPending = true;
+}
+
 // 单次按键（边沿触发）：本帧内被消费一次即失效
 export function consumePressed(code: string) {
   const has = pressed.has(code);

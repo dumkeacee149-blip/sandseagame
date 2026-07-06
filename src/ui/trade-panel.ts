@@ -1,6 +1,6 @@
 import type { GameState, GoodId, PortId, UpgradeId } from "../game/data";
-import { GOODS, UPGRADES, TREASURE_MAP_COST, cargoCapacity, cargoCount } from "../game/data";
-import { findPort, buyGood, sellGood, buyUpgrade, buyTreasureMap } from "../game/economy";
+import { GOODS, UPGRADES, TREASURE_MAP_COST, TOKEN_RATE, cargoCapacity, cargoCount } from "../game/data";
+import { findPort, buyGood, sellGood, buyUpgrade, buyTreasureMap, exchangeTokens } from "../game/economy";
 import { getState, setState, subscribe } from "../game/store";
 
 const UPGRADE_LABELS: Record<UpgradeId, { name: string; unit: string }> = {
@@ -51,6 +51,10 @@ function ensurePanel() {
     }
     if (action === "treasure-map") {
       setState(buyTreasureMap(getState()));
+      return;
+    }
+    if (action === "exchange") {
+      setState(exchangeTokens(getState(), 1));
       return;
     }
     const good = button.dataset.good as GoodId;
@@ -138,11 +142,21 @@ function render(state: GameState) {
       </div>`
       : "";
 
+  // 金库兑换：金币 → $SAND（预发布记账，TGE 后接链上结算）
+  const exchangeRow = `
+      <p class="trade-eyebrow trade-section">Token Vault</p>
+      <div class="trade-row">
+        <div class="trade-good"><b>$SAND Ledger</b><span>holding ${state.tokens} · pre-launch ledger, settles on-chain at token launch</span></div>
+        <div class="trade-actions trade-upgrade">
+          <button data-action="exchange" ${state.gold >= TOKEN_RATE ? "" : "disabled"}>Exchange · ${TOKEN_RATE}g → 1 $SAND</button>
+        </div>
+      </div>`;
+
   panelEl.innerHTML = `
     <div class="trade-head">
       <div>
         <p class="trade-eyebrow">${port.name} Market</p>
-        <p class="trade-stats"><b>${state.gold}</b> gold · cargo <b>${held}/${capacity}</b></p>
+        <p class="trade-stats"><b>${state.gold}</b> gold · cargo <b>${held}/${capacity}</b> · <b>${state.tokens}</b> $SAND</p>
       </div>
       <button data-action="close" class="trade-close" aria-label="Close">✕</button>
     </div>
@@ -150,5 +164,6 @@ function render(state: GameState) {
     <p class="trade-eyebrow trade-section">Shipwright Upgrades</p>
     ${upgradeRows}
     ${treasureRow}
+    ${exchangeRow}
     <p class="trade-hint">E / Esc to leave</p>`;
 }
