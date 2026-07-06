@@ -8,4 +8,5 @@ class_name = "ChatRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["ChatRoom"]
+# SQLite-backed DO：Workers 免费计划即可用
+new_sqlite_classes = ["ChatRoom"]
