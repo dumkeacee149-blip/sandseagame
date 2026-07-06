@@ -1,0 +1,59 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - heading "Sandsea Privateers" [level=2] [ref=f2e3]
+    - paragraph [ref=f2e4]: Charting the sandsea…
+  - main "Sandsea privateers status":
+    - generic:
+      - generic:
+        - paragraph: Sandsea Privateers
+        - heading "Dune Corsair" [level=1]
+      - generic:
+        - generic:
+          - generic:
+            - img
+          - generic: "0"
+          - emphasis: knots
+        - generic:
+          - generic:
+            - img
+          - generic: "0"
+          - emphasis: gold
+        - generic:
+          - generic:
+            - img
+          - generic: 0/8
+          - emphasis: cargo
+        - generic:
+          - generic:
+            - img
+          - generic: "100"
+          - emphasis: hull
+    - generic:
+      - generic: Open Sandsea
+  - status
+  - generic "Minimap"
+  - generic:
+    - paragraph: ⚓ Harbor Band · GLOBAL
+    - list:
+      - listitem: Harbormaster Welcome to the Sandsea, Captain. Markets are marked overhead.
+      - listitem: Harbormaster Connected to the global Harbor Band.
+  - generic: WASD move · E interact · Space jump · Click attack · Drag rotate · Enter chat
+  - generic:
+    - paragraph:
+      - text: Voyage Log
+      - generic: 0/14
+    - list:
+      - listitem:
+        - generic: ►
+        - generic:
+          - text: Dock at Oasis Harbor and go ashore
+          - emphasis: +15g
+  - generic [ref=f2e7]:
+    - paragraph [ref=f2e8]: Sandsea Privateers
+    - paragraph [ref=f2e9]: Link your wallet to sail
+    - paragraph [ref=f2e10]: Your Solana wallet is your captain's identity — progress is saved per wallet, and in-game $SAND ledger binds to it.
+    - button "Install Phantom" [ref=f2e11] [cursor=pointer]
+    - paragraph [ref=f2e12]:
+      - link "Enter as guest" [ref=f2e13] [cursor=pointer]:
+        - /url: "#"
+      - text: — progress stays on this device only

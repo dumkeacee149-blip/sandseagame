@@ -123,6 +123,8 @@ export function initChat() {
 
   window.addEventListener("keydown", (event) => {
     if (event.code !== "Enter") return;
+    // 观众模式聊天面板整体隐藏，不能让看不见的输入框抢焦点
+    if (document.body.classList.contains("spectator")) return;
     if (!isChatOpen() && !isKeyCaptured()) {
       event.preventDefault();
       openChatInput();

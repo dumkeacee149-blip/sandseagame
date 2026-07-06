@@ -54,7 +54,7 @@ import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, 
 import { updateWormAi, wormAi, wormAgents, damageWorm } from "./game/worm-ai";
 import type { WormAgent } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
-import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
+import { resolveIdentity, isWalletLinked, shortIdentity, isSpectator, connectWallet } from "./core/wallet";
 import { initPresence, presenceDebug } from "./net/presence";
 import { initRemoteShips, updateRemoteShips } from "./net/remote-ships";
 import {
@@ -432,27 +432,66 @@ function shipSnapshot() {
   return { x: shipState.position.x, z: shipState.position.z, heading: shipState.heading };
 }
 
+// ===== 观众模式：未链接钱包只能观看 =====
+// 无船无档无广播，镜头绕沙海慢速环游；横幅引导链接钱包后重载进入完整游戏。
+let spectating = false;
+
+function enterSpectatorMode() {
+  document.body.classList.add("spectator");
+  ship.visible = false;
+
+  const banner = document.createElement("div");
+  banner.className = "spectator-banner";
+  banner.innerHTML = `
+    <span>Spectating the Sandsea — link your wallet to take the helm</span>
+    <button class="modal-button" id="spectator-connect">Connect Wallet</button>`;
+  document.body.appendChild(banner);
+
+  banner.querySelector("#spectator-connect")?.addEventListener("click", async () => {
+    try {
+      const key = await connectWallet();
+      if (key) location.reload();
+    } catch (error) {
+      console.error("钱包连接被拒绝", error);
+    }
+  });
+}
+
+// 观众镜头：高机位绕世界中心慢速环游
+function updateSpectatorCamera(elapsed: number) {
+  const angle = elapsed * 0.03;
+  camera.position.set(Math.cos(angle) * 640, 300, Math.sin(angle) * 640);
+  camera.lookAt(0, 30, 0);
+}
+
 // 启动流程：先解析钱包身份（登录门）→ 载入该身份的存档 → 起引擎。
 // 存档按钱包隔离；之后每次状态变更（交易/任务奖励等离散事件）自动写入。
 function startGame() {
-  const savedGame = load();
-  if (savedGame) {
-    resetState(savedGame.state);
-    shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
-    shipState.heading = savedGame.ship.heading;
-  }
-  applyOutfit(getState().outfit);
-  subscribe((state) => save(state, shipSnapshot()));
+  spectating = isSpectator();
 
-  if (isWalletLinked()) {
-    const eyebrow = document.querySelector(".brand-title .eyebrow");
-    if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
-    postChat("Harbormaster", `Wallet linked: ${shortIdentity()}. Your voyage is bound to it.`);
+  if (spectating) {
+    enterSpectatorMode();
+  } else {
+    const savedGame = load();
+    if (savedGame) {
+      resetState(savedGame.state);
+      shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
+      shipState.heading = savedGame.ship.heading;
+    }
+    applyOutfit(getState().outfit);
+    subscribe((state) => save(state, shipSnapshot()));
+
+    if (isWalletLinked()) {
+      const eyebrow = document.querySelector(".brand-title .eyebrow");
+      if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
+      postChat("Harbormaster", `Wallet linked: ${shortIdentity()}. Your voyage is bound to it.`);
+    }
+    // 只有真正的船长向同世界广播船位；观众只看不出现
+    initPresence(() => (mode === "walking" ? "walking" : "sailing"));
   }
 
-  // 同世界在线（可选叠加层）：未配置 presence 地址时两者都是空操作
+  // 同世界在线（可选叠加层）：未配置 presence 地址时是空操作；观众也能看到他船
   initRemoteShips(scene);
-  initPresence(() => (mode === "walking" ? "walking" : "sailing"));
 
   renderer.setAnimationLoop(() => {
     animate();
@@ -494,6 +533,22 @@ if (import.meta.env.DEV) {
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
+
+  if (spectating) {
+    // 只演不玩：世界照常呼吸（沙虫巡逻、集市旗标、云与风、他船同步），不接任何输入。
+    // 隐藏船停在原点，离所有沙虫领地 700+（攻击圈 450），不会触发咬击。
+    clearFramePresses();
+    updateWormAi(delta, true);
+    worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
+    updateMarkers(elapsed);
+    updateRemoteShips(elapsed);
+    cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
+    windParticles.position.x = ((elapsed * 48) % 900) - 450;
+    windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
+    updateSpectatorCamera(elapsed);
+    renderer.render(scene, camera);
+    return;
+  }
 
   if (isModalOpen()) {
     // 结算弹窗期间世界暂停接收输入，只维持渲染

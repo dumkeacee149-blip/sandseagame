@@ -18,6 +18,8 @@ declare global {
 
 const REMEMBER_KEY = "sandsea-wallet";
 let identity = "guest";
+// 未链接钱包只能观看：仅登录门的观众入口置真；DEV 自动访客仍可玩（保测试链路）
+let spectatorEntry = false;
 
 export function getIdentity() {
   return identity;
@@ -25,6 +27,10 @@ export function getIdentity() {
 
 export function isWalletLinked() {
   return identity !== "guest";
+}
+
+export function isSpectator() {
+  return spectatorEntry;
 }
 
 export function shortIdentity() {
@@ -47,7 +53,7 @@ function buildGate(onResolve: () => void) {
       <p class="wallet-title">Link your wallet to sail</p>
       <p class="wallet-line">Your Solana wallet is your captain's identity — progress is saved per wallet, and in-game $SAND ledger binds to it.</p>
       <button class="modal-button" id="wallet-connect">${provider ? "Connect Wallet" : "Install Phantom"}</button>
-      <p class="wallet-line wallet-guest-line"><a href="#" id="wallet-guest">Enter as guest</a> — progress stays on this device only</p>
+      <p class="wallet-line wallet-guest-line"><a href="#" id="wallet-guest">Enter as spectator</a> — watch the sandsea; link a wallet to take the helm</p>
     </div>`;
   document.body.appendChild(gate);
 
@@ -75,8 +81,37 @@ function buildGate(onResolve: () => void) {
 
   gate.querySelector("#wallet-guest")?.addEventListener("click", (event) => {
     event.preventDefault();
+    spectatorEntry = true;
     finish("guest");
   });
+}
+
+// 显式连接（官网导航等场景复用）：连上即记忆，游戏侧走静默重连免弹窗。
+// 无 provider 时引导装 Phantom，返回 null。
+export async function connectWallet(): Promise<string | null> {
+  const provider = findProvider();
+  if (!provider) {
+    window.open("https://phantom.com/", "_blank", "noopener");
+    return null;
+  }
+  const result = await provider.connect();
+  const key = result.publicKey.toString();
+  localStorage.setItem(REMEMBER_KEY, key);
+  identity = key;
+  return key;
+}
+
+// 静默重连：仅在曾授权过时成功，失败不打扰用户
+export async function silentReconnect(): Promise<string | null> {
+  const provider = findProvider();
+  if (!provider || !localStorage.getItem(REMEMBER_KEY)) return null;
+  try {
+    const result = await provider.connect({ onlyIfTrusted: true });
+    identity = result.publicKey.toString();
+    return identity;
+  } catch {
+    return null;
+  }
 }
 
 // 启动身份解析：开发环境自动访客（?wallet=1 强制真流程）；
