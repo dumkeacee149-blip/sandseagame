@@ -62,8 +62,11 @@ presence 房间即可实现 P0**，不需要引入新厂商或专用游戏同步
 - 输入校验：坐标 clamp 到世界边界 ±1420、速度 clamp 到最大帆速上限、
   上报频率限流（>20Hz 丢弃），字符串字段截断——不信任客户端。
 - 10Hz `setInterval` tick 聚合广播；15 秒无心跳踢下线。
-- 用 WebSocket Hibernation API 控制 DO 计费时长。
+- 不用 Hibernation API：10Hz tick 下 DO 在有人在线时本就不会休眠，
+  与聊天 Worker 保持同一简单模式；空房间时 DO 自然回收。
 - 部署与聊天 Worker 相同：`npx wrangler deploy`，前端配 `VITE_PRESENCE_WS_URL`。
+- 房间逻辑抽在 `presence-core.js`（零依赖纯模块），本地测试服务器
+  `scripts/presence-test-server.mjs` 复用同一份代码——Playwright 测的就是线上逻辑。
 
 ## 五、客户端实现
 
@@ -96,7 +99,7 @@ presence 房间即可实现 P0**，不需要引入新厂商或专用游戏同步
 
 | 阶段 | 内容 | 规模估算 |
 |------|------|----------|
-| **P0 彼此见船** | presence Worker + 客户端两模块 + 名牌 + 插值 | Worker ~150 行；客户端 ~250 行 |
+| **P0 彼此见船（已完成 2026-07-06）** | presence Worker + 客户端两模块 + 名牌 + 插值 | Worker ~150 行；客户端 ~250 行 |
 | P1 岸上互动 | 步行小人同步、挥手表情、在线玩家列表、聊天接身份昵称 | 中 |
 | P2 玩法互动 | 服务器权威世界事件（共享沙虫）、玩家间交易、组队赏金 | 大（需权威服务器 + 签名登录） |
 
