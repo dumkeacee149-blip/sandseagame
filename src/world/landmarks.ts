@@ -204,6 +204,38 @@ export function createSaltFlats() {
   return group;
 }
 
+// Duneskull 前哨：最危险的远港——巨兽遗骨拱门当门面，干燥无水，账篷集市贴着骨架扎营
+export function createDuneskullCamp() {
+  const group = new THREE.Group();
+  group.position.set(1150, 0, -1150);
+
+  // 门面：半埋的巨兽肋骨拱在集市正后方
+  placeEnv(group, "/models/ribs.glb", 96, 6, -52, 0.35, 40);
+
+  const tentPlaceholder = createVoxelAsset("A03");
+  tentPlaceholder.scale.setScalar(10);
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
+  tent.position.set(0, 0, -4);
+  tent.rotation.y = -Math.PI / 6;
+  group.add(tent);
+
+  placeEnv(group, "/models/stall_b.glb", 32, 40, 24, 0.8);
+  placeEnv(group, "/models/tower.glb", 30, -66, -34, 0.4, 82);
+  placeEnv(group, "/models/deadwood.glb", 28, 72, -58, 1.9, 38);
+  placeEnv(group, "/models/deadwood.glb", 24, -88, 38, 4.4, 34);
+  placeEnv(group, "/models/rock_c.glb", 42, 92, 66, 2.6, 34);
+  placeEnv(group, "/models/jetty.glb", 50, 0, 205, 0, 14);
+
+  for (let i = 0; i < 4; i += 1) {
+    const crate = box(13, 11, 13, mat("crate", "#8a5a35"), [-38 + i * 20, 16, 52]);
+    breakableCrates.push(crate);
+    group.add(crate);
+  }
+
+  groundChildren(group);
+  return group;
+}
+
 // 沙海散布：礁岩(带船碰撞)/枯木/巨兽遗骨
 export function createSeaScatter() {
   const group = new THREE.Group();

@@ -28,6 +28,7 @@ import {
   createSaltcrestCamp,
   createDistantCaravans,
   createSeaScatter,
+  createDuneskullCamp,
   breakableCrates,
 } from "./world/landmarks";
 import { createWorm, updateWorm } from "./world/worm";
@@ -145,6 +146,7 @@ scene.add(createOasisPort());
 scene.add(createRuins());
 scene.add(createSaltFlats());
 scene.add(createSaltcrestCamp());
+scene.add(createDuneskullCamp());
 scene.add(createSeaScatter());
 scene.add(createMarketMarkers());
 // 三只沙虫：各守一块领地（worm-ai 的 wormAgents 一一对应）
@@ -156,6 +158,25 @@ const worms = wormAgents.map(() => {
 scene.add(createDistantCaravans());
 const windParticles = createWindParticles();
 scene.add(windParticles);
+
+// 鱼叉炮视觉挂载：购置后出现在艉甲板（独立于船的换装槽，跟随船位与朝向）
+const harpoonPlaceholder = createVoxelAsset("A09");
+harpoonPlaceholder.scale.setScalar(4.6);
+const harpoonMount = hunyuanSlot(harpoonPlaceholder, "/models/cannon.glb");
+harpoonMount.visible = false;
+scene.add(harpoonMount);
+
+const harpoonOffset = new THREE.Vector3();
+
+function syncHarpoonMount() {
+  harpoonMount.visible = getState().harpoon;
+  if (!harpoonMount.visible) return;
+  const heading = shipState.heading;
+  // 艉甲板局部偏移 (0, 15, -16) 旋转到世界系
+  harpoonOffset.set(Math.sin(heading) * -14, 16, Math.cos(heading) * -14);
+  harpoonMount.position.copy(ship.position).add(harpoonOffset);
+  harpoonMount.rotation.y = heading;
+}
 
 // 玩家小人：航行时隐藏，下船后现身（贴近 ARRR 的上岸/上船切换）
 const player = createPlayerAvatar();
@@ -546,6 +567,7 @@ function animate() {
 
   // 步行/交易模式下船不受控但仍要贴地并停在逻辑位置（航行模式下等价于重复赋值）
   syncShipVisual(ship, elapsed);
+  syncHarpoonMount();
   updateSplinters(delta);
   updateBolts(delta);
   worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));

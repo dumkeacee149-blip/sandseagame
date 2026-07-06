@@ -28,6 +28,7 @@ export const ISLANDS: readonly IslandDef[] = [
   { id: "oasis", x: -520, z: -380, plateauRadius: 210, falloff: 130, height: 26 },
   { id: "saltcrest", x: 340, z: 700, plateauRadius: 170, falloff: 110, height: 22 },
   { id: "ruins", x: 650, z: 280, plateauRadius: 160, falloff: 100, height: 12 },
+  { id: "duneskull", x: 1150, z: -1150, plateauRadius: 170, falloff: 110, height: 24 },
 ] as const;
 
 // 岛屿抬升量：台地内全高，坡带 smoothstep 过渡到沙海
