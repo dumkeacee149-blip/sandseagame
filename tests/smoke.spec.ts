@@ -159,8 +159,11 @@ test("巨兽咬击会进入 bite 状态再下潜", async ({ page }) => {
     g.wormAi.mode = "chase";
   });
 
-  await expect.poll(async () => page.evaluate(() => window.__game!.wormAi.mode), { timeout: 1_000 }).toBe("bite");
-  await expect.poll(async () => page.evaluate(() => window.__game!.wormAi.mode), { timeout: 2_000 }).toBe("dive");
+  // 宽轮询窗：headless 软件渲染下场景帧率可低至约 8fps，而 delta 有 0.05s 封顶，
+  // 游戏时间随之膨胀——0.55s 的咬击需约 12 帧才走完。窗口只影响等待上限，不改变
+  // 断言语义（先 bite 后 dive；dive 持续 3s 游戏时间，轮询不会漏采）。
+  await expect.poll(async () => page.evaluate(() => window.__game!.wormAi.mode), { timeout: 5_000 }).toBe("bite");
+  await expect.poll(async () => page.evaluate(() => window.__game!.wormAi.mode), { timeout: 6_000 }).toBe("dive");
 });
 
 test("触屏布局不遮挡底部操作区，并提供攻击按钮", async ({ page }) => {
