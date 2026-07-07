@@ -187,6 +187,35 @@
 
       footer { padding: 34px 20px 44px; text-align: center; font-size: 0.78rem; color: rgba(246, 236, 210, 0.5); }
       footer a { color: var(--brass); }
+
+      @media (max-width: 680px) {
+        nav {
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 8px 12px;
+          padding: 10px 12px;
+        }
+        nav .wordmark {
+          max-width: calc(100vw - 108px);
+          overflow-wrap: anywhere;
+          line-height: 1;
+        }
+        nav .links {
+          width: 100%;
+          margin-left: 0;
+          gap: 10px;
+          justify-content: space-between;
+        }
+        nav .links a {
+          font-size: 0.8rem;
+        }
+        nav .play {
+          padding: 7px 12px;
+        }
+        header {
+          padding-top: 132px;
+        }
+      }
     </style>
   </head>
   <body>

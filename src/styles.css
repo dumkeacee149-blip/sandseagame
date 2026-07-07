@@ -693,6 +693,11 @@ h1 {
     gap: 8px;
     padding: 10px 14px;
   }
+
+  .stat-grid {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
 }
 
 /* ---------- 触屏控制 ---------- */
@@ -799,12 +804,55 @@ h1 {
     max-width: calc(100vw - 132px);
   }
 
+  .brand-title {
+    min-width: 0;
+  }
+
+  h1 {
+    overflow-wrap: anywhere;
+  }
+
   .stat-chip {
     padding: 4px 8px;
   }
 
   .stat-chip b {
     font-size: 1.05rem;
+  }
+
+  .touch-mode .route-chip {
+    top: calc(158px + env(safe-area-inset-top));
+  }
+}
+
+@media (max-width: 520px) {
+  .trade-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 96px);
+    padding: 16px 14px 14px;
+  }
+
+  .trade-head {
+    gap: 10px;
+  }
+
+  .trade-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .trade-actions {
+    flex-wrap: wrap;
+  }
+
+  .trade-actions button {
+    flex: 1 1 112px;
+    white-space: normal;
+  }
+
+  .trade-upgrade {
+    grid-column: auto;
+    justify-self: stretch;
   }
 }
 
