@@ -10,7 +10,7 @@ if (button) {
 
 function markLinked(anchor: HTMLAnchorElement) {
   anchor.textContent = `⚓ ${shortIdentity()}`;
-  anchor.href = "/";
+  anchor.href = "/?play=1";
   anchor.dataset.linked = "1";
 }
 

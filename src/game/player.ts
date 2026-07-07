@@ -5,6 +5,7 @@ import { loadRiggedModel, fitRiggedToPlaceholder } from "../core/models";
 import { createVoxelAsset } from "../voxel-assets";
 import type { OutfitState } from "./data";
 import { OUTFIT_DEFAULT } from "./data";
+import { getSelectedHero, heroModelUrl, HERO_STRIP_NODES, type HeroId } from "./heroes";
 
 export type PlayerState = {
   position: THREE.Vector3;
@@ -110,25 +111,47 @@ function playAction(name: string, fade = 0.18) {
   currentAction = name;
 }
 
-export function createPlayerAvatar() {
-  const rig = new THREE.Group();
+// KayKit 内置 75 个剪辑，游戏只用四个；Attack 选横斩最贴近原来的挥刀
+const CLIP_MAP = {
+  Idle: "Idle",
+  Walk: "Walking_A",
+  Run: "Running_A",
+  Attack: "1H_Melee_Attack_Slice_Horizontal",
+} as const;
 
-  const placeholder = createVoxelAsset("A02");
-  placeholder.scale.setScalar(4.2);
-  rig.add(placeholder);
+// 只留一件标志性主手武器，其余备用道具从骨架上摘掉
+export function stripHeroProps(model: THREE.Object3D, hero: HeroId) {
+  for (const name of HERO_STRIP_NODES[hero]) {
+    const node = model.getObjectByName(name);
+    node?.removeFromParent();
+  }
+}
 
-  loadRiggedModel("/models/hero_kaykit_rogue.glb?v=kaykit-adventurers-1")
+let avatarRig: THREE.Group | null = null;
+let voxelPlaceholder: THREE.Object3D | null = null;
+// 快速连点换人时只认最后一次请求
+let heroLoadToken = 0;
+
+// 运行时换船长：卸下旧模型（或体素占位），装上所选角色并重建动画状态机
+export function setHero(hero: HeroId) {
+  if (!avatarRig || !voxelPlaceholder) return;
+  const token = ++heroLoadToken;
+  loadRiggedModel(heroModelUrl(hero))
     .then(({ scene: model, animations }) => {
-      // KayKit 角色自带全套武器道具网格，只留主手刀配合挥刀动画
-      stripUnusedProps(model);
-      fitRiggedToPlaceholder(model, placeholder);
-      rig.remove(placeholder);
-      rig.add(model);
+      if (token !== heroLoadToken || !avatarRig || !voxelPlaceholder) return;
+      stripHeroProps(model, hero);
+      fitRiggedToPlaceholder(model, voxelPlaceholder);
+      if (riggedModel) avatarRig.remove(riggedModel);
+      avatarRig.remove(voxelPlaceholder);
+      avatarRig.add(model);
       riggedModel = model;
       needsReground = true;
+      outfitMaterials.clear();
       collectOutfitMaterials(model);
       applyOutfit(pendingOutfit);
       mixer = new THREE.AnimationMixer(model);
+      for (const key of Object.keys(actions)) delete actions[key];
+      currentAction = "";
       // KayKit 剪辑名 → 游戏四态状态机名
       for (const [gameName, clipName] of Object.entries(CLIP_MAP)) {
         const clip = animations.find((item) => item.name === clipName);
@@ -143,8 +166,20 @@ export function createPlayerAvatar() {
       playAction("Idle");
     })
     .catch((error) => {
-      console.error("骨骼主角加载失败，保留体素占位", error);
+      console.error("骨骼主角加载失败，保留当前形象", error);
     });
+}
+
+export function createPlayerAvatar() {
+  const rig = new THREE.Group();
+
+  const placeholder = createVoxelAsset("A02");
+  placeholder.scale.setScalar(4.2);
+  rig.add(placeholder);
+
+  avatarRig = rig;
+  voxelPlaceholder = placeholder;
+  setHero(getSelectedHero());
 
   return rig;
 }

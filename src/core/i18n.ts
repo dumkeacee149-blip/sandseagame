@@ -98,7 +98,7 @@ const en: Dict = {
 
   // 交易面板
   "trade.market": "{port} Market",
-  "trade.stats": "<b>{gold}</b> gold · cargo <b>{held}/{cap}</b> · <b>{tokens}</b> $SAND",
+  "trade.stats": "<b>{gold}</b> gold · cargo <b>{held}/{cap}</b>",
   "trade.held": "held {n}",
   "trade.buy": "Buy {qty} · {price}g",
   "trade.sell": "Sell {qty} · {price}g",
@@ -321,7 +321,7 @@ const zh: Dict = {
   "quest.chest": "打开沉没遗迹的遗物宝箱",
 
   "trade.market": "{port}集市",
-  "trade.stats": "<b>{gold}</b> 金币 · 货舱 <b>{held}/{cap}</b> · <b>{tokens}</b> $SAND",
+  "trade.stats": "<b>{gold}</b> 金币 · 货舱 <b>{held}/{cap}</b>",
   "trade.held": "持有 {n}",
   "trade.buy": "买 {qty} · {price} 金",
   "trade.sell": "卖 {qty} · {price} 金",
@@ -496,6 +496,10 @@ export function toggleLang() {
 
 export function onLangChange(listener: () => void) {
   listeners.add(listener);
+  // 返回退订函数：临时性 UI（如选船长面板）关闭时解除监听，避免泄漏
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 // 取文案并替换 {param} 占位符；缺 key 时回退英文字典，再退回 key 本身

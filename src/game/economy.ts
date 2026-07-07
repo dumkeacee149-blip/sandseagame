@@ -9,7 +9,6 @@ import {
   STRAND_TOW_FEE,
   TREASURE_MAP_COST,
   TREASURE_REWARD,
-  TOKEN_RATE,
   cargoCapacity,
   cargoCount,
   maxHull,
@@ -161,13 +160,6 @@ export function recordCrateBreak(state: GameState, crateId: string): GameState {
     cratesBroken: state.cratesBroken + 1,
     brokenCrateIds: [...state.brokenCrateIds, crateId],
   };
-}
-
-// 金币→$SAND 兑换（预发布记账）
-export function exchangeTokens(state: GameState, count: number): GameState {
-  const cost = count * TOKEN_RATE;
-  if (count <= 0 || state.gold < cost) return state;
-  return { ...state, gold: state.gold - cost, tokens: state.tokens + count };
 }
 
 // 船坞购置鱼叉炮：猎杀沙虫的门槛

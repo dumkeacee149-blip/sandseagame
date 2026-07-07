@@ -6,7 +6,7 @@
     <title>Sandsea Privateers — Sail. Trade. Survive. Claim.</title>
     <meta
       name="description"
-      content="A voxel desert-pirate trading adventure in your browser. Run trade routes across the sand sea, outfit your skiff, outrun the leviathan — and bind your voyage to your Solana wallet."
+      content="A voxel desert-pirate trading adventure in your browser. Run trade routes across the sand sea, outfit your skiff, outrun the leviathan — and bind your voyage to your wallet."
     />
     <meta property="og:title" content="Sandsea Privateers" />
     <meta property="og:description" content="Sail. Trade. Survive. Claim. A voxel sand-sea adventure in your browser." />
@@ -15,8 +15,21 @@
     <style>
       /* 官网自包含样式：与游戏同一"船长的航海桌"语言 */
       @font-face {
-        font-family: "Pirata One";
-        src: url("/fonts/pirata-one.woff2") format("woff2");
+        font-family: "Alfa Slab One";
+        src: url("/fonts/alfa-slab-one.woff2") format("woff2");
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Bitter";
+        src: url("/fonts/bitter.woff2") format("woff2");
+        font-weight: 100 900;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Bitter";
+        src: url("/fonts/bitter-italic.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: italic;
         font-display: swap;
       }
       :root {
@@ -29,8 +42,8 @@
         --brass-bright: #ecc06a;
         --brass-dim: rgba(201, 151, 62, 0.55);
         --cream: #f6ecd2;
-        --display: "Pirata One", Georgia, serif;
-        --body: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+        --display: "Alfa Slab One", "Rockwell Extra Bold", Georgia, serif;
+        --body: "Bitter", "Iowan Old Style", Palatino, Georgia, serif;
       }
       * { box-sizing: border-box; }
       body {
@@ -55,8 +68,8 @@
         background: linear-gradient(178deg, var(--brass-bright), var(--brass) 55%, #a4762c);
         color: var(--ink);
         font-family: var(--display);
-        font-size: 1.3rem;
-        letter-spacing: 0.05em;
+        font-size: 1.05rem;
+        letter-spacing: 0.03em;
         text-decoration: none;
         box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.75), 0 4px 0 rgba(24, 14, 5, 0.7);
       }
@@ -83,12 +96,12 @@
         padding: 10px 18px;
         z-index: 10;
       }
-      nav .wordmark { font-family: var(--display); font-size: 1.3rem; color: var(--cream); text-decoration: none; }
+      nav .wordmark { font-family: var(--display); font-size: 1rem; color: var(--cream); text-decoration: none; }
       nav .tag { font-size: 0.6rem; letter-spacing: 0.16em; color: var(--brass-bright); border: 1px solid var(--brass-dim); border-radius: 99px; padding: 2px 8px; }
       nav .links { margin-left: auto; display: flex; gap: 18px; align-items: center; }
       nav .links a { color: rgba(246, 236, 210, 0.8); text-decoration: none; font-size: 0.88rem; }
       nav .links a:hover { color: var(--brass-bright); }
-      nav .play { font-family: var(--display); background: linear-gradient(178deg, var(--brass-bright), var(--brass)); color: var(--ink); padding: 8px 20px; border-radius: 6px; text-decoration: none; box-shadow: 0 3px 0 rgba(24,14,5,0.7); }
+      nav .play { font-family: var(--display); font-size: 0.85rem; background: linear-gradient(178deg, var(--brass-bright), var(--brass)); color: var(--ink); padding: 8px 20px; border-radius: 6px; text-decoration: none; box-shadow: 0 3px 0 rgba(24,14,5,0.7); }
 
       /* 英雄区：满屏游戏实景 */
       header {
@@ -125,9 +138,9 @@
         margin: 0;
         font-family: var(--display);
         font-weight: 400;
-        font-size: clamp(3rem, 9vw, 6.4rem);
-        line-height: 0.95;
-        letter-spacing: 0.04em;
+        font-size: clamp(2.4rem, 7.5vw, 5rem);
+        line-height: 1.04;
+        letter-spacing: 0.01em;
         text-shadow: 0 4px 0 rgba(24, 14, 5, 0.85), 0 14px 40px rgba(15, 8, 2, 0.8);
       }
       .tagline {
@@ -149,7 +162,6 @@
         color: rgba(246, 236, 210, 0.85);
       }
       .pill b { color: var(--brass-bright); }
-      .ca-pill { margin-top: 12px; font-size: 0.72rem; font-family: ui-monospace, monospace; color: rgba(246, 236, 210, 0.55); }
 
       /* 章节 */
       section { padding: 76px 20px; }
@@ -158,8 +170,8 @@
         margin: 0 0 34px;
         font-family: var(--display);
         font-weight: 400;
-        font-size: clamp(1.8rem, 4vw, 2.6rem);
-        letter-spacing: 0.04em;
+        font-size: clamp(1.4rem, 3.2vw, 2.1rem);
+        letter-spacing: 0.01em;
         text-align: center;
         color: var(--brass-bright);
       }
@@ -171,19 +183,12 @@
         border-radius: 4px;
         clip-path: polygon(0 3%, 6% 0, 50% 1.5%, 94% 0, 100% 3%, 99% 97%, 94% 100%, 50% 98.5%, 6% 100%, 1% 97%);
       }
-      .step b { display: block; font-family: var(--display); font-weight: 400; font-size: 1.25rem; margin-bottom: 8px; color: #6b4a1c; }
+      .step b { display: block; font-family: var(--display); font-weight: 400; font-size: 1rem; margin-bottom: 8px; color: #6b4a1c; }
       .step p { margin: 0; font-size: 0.88rem; line-height: 1.55; }
       .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
       .feature { padding: 22px 20px; }
-      .feature b { display: block; font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--brass-bright); margin-bottom: 8px; }
+      .feature b { display: block; font-family: var(--display); font-weight: 400; font-size: 0.95rem; color: var(--brass-bright); margin-bottom: 8px; }
       .feature p { margin: 0; font-size: 0.85rem; line-height: 1.55; color: rgba(246, 236, 210, 0.78); }
-
-      /* 代币区 */
-      .token { text-align: center; }
-      .token-line { max-width: 620px; margin: 0 auto 26px; font-size: 0.95rem; line-height: 1.65; color: rgba(246, 236, 210, 0.85); }
-      .token-flow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 26px; }
-      .token-flow .pill { font-size: 0.85rem; }
-      .disclaimer { max-width: 640px; margin: 0 auto; font-size: 0.72rem; line-height: 1.6; color: rgba(246, 236, 210, 0.45); }
 
       footer { padding: 34px 20px 44px; text-align: center; font-size: 0.78rem; color: rgba(246, 236, 210, 0.5); }
       footer a { color: var(--brass); }
@@ -221,11 +226,10 @@
   <body>
     <nav class="plaque">
       <a class="wordmark" href="/landing.html">Sandsea Privateers</a>
-      <span class="tag">ALPHA</span>
+      <span class="tag">BETA</span>
       <div class="links">
         <a href="#how">How to Play</a>
-        <a href="#token">$SAND</a>
-        <a class="play" id="nav-wallet" href="#">Connect Wallet</a>
+        <a class="play" href="https://x.com/SandseaGame" target="_blank" rel="noopener">Follow on 𝕏</a>
       </div>
     </nav>
 
@@ -237,15 +241,13 @@
         outfit your skiff, outrun the leviathan — and claim the relic vault. Right in your browser.
       </p>
       <div class="cta-row">
-        <a class="btn" href="/">⚓ Play Now</a>
+        <a class="btn" href="/?play=1">⚓ Play Now</a>
         <a class="btn btn-ghost" href="#how">Read the Log</a>
       </div>
       <div class="pills">
         <span class="pill"><b>Browser</b> · no download</span>
-        <span class="pill"><b>Wallet-linked</b> voyages · Solana</span>
-        <span class="pill"><b>$SAND</b> · pre-launch</span>
+        <span class="pill"><b>Wallet-linked</b> voyages</span>
       </div>
-      <p class="ca-pill">CA: announced at token launch — beware of imitations</p>
     </header>
 
     <section id="how">
@@ -254,7 +256,7 @@
         <div class="steps">
           <div class="step">
             <b>1 · Link &amp; Sail</b>
-            <p>Connect your Solana wallet — it is your captain's identity, and your voyage saves to it. Then take the helm: WASD to sail, E to go ashore.</p>
+            <p>Connect your wallet — it is your captain's identity, and your voyage saves to it. Then take the helm: WASD to sail, E to go ashore.</p>
           </div>
           <div class="step">
             <b>2 · Trade &amp; Outfit</b>
@@ -262,7 +264,7 @@
           </div>
           <div class="step">
             <b>3 · Risk &amp; Claim</b>
-            <p>The far route to Duneskull pays triple — through leviathan territory. Survive it, buy the map, open the relic vault, and swap gold for $SAND.</p>
+            <p>The far route to Duneskull pays triple — through leviathan territory. Survive it, buy the map, and open the relic vault.</p>
           </div>
         </div>
       </div>
@@ -292,30 +294,9 @@
       </div>
     </section>
 
-    <section id="token">
-      <div class="wrap token">
-        <h2>Gold Today, $SAND at Launch</h2>
-        <p class="token-line">
-          Everything you earn in the game is gold. At any market's Token Vault you can exchange gold into the
-          $SAND ledger bound to your wallet. When the token launches on Solana, ledger balances settle on-chain.
-        </p>
-        <div class="token-flow">
-          <span class="pill">Earn gold by quests &amp; trade</span>
-          <span class="pill">→ Exchange at the Token Vault</span>
-          <span class="pill">→ Settles on-chain at launch</span>
-        </div>
-        <p class="disclaimer">
-          $SAND is a planned in-game utility token on Solana. Pre-launch ledger balances are game records, not
-          on-chain assets, and carry no guarantee of value. Nothing on this page is financial advice. Terms,
-          supply and contract address will be published at launch — trust only addresses announced here.
-        </p>
-      </div>
-    </section>
-
     <footer>
-      Sandsea Privateers — hand-built voxel world, sailed by captains like you. <a href="/">Set sail</a>.
+      Sandsea Privateers — hand-built voxel world, sailed by captains like you. <a href="/?play=1">Set sail</a>.
     </footer>
     <script type="module" src="/src/landing-hero.ts"></script>
-    <script type="module" src="/src/landing-wallet.ts"></script>
   </body>
 </html>

@@ -4,6 +4,10 @@ import { palette } from "./core/palette";
 import {
   initInput,
   initMouse,
+  initPointerLock,
+  isPointerLocked,
+  exitPointerLock,
+  isKeyCaptured,
   consumePressed,
   consumeClick,
   consumeDrag,
@@ -45,10 +49,12 @@ import {
 import { updateHud, updatePlayerHpChip } from "./ui/hud";
 import { initControlsHint, updateControlsHint } from "./ui/controls-hint";
 import { initQuests } from "./ui/quests";
-import { initChat, postChat } from "./ui/chat";
+import { initChat, postChatT } from "./ui/chat";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
 import { showModal, isModalOpen } from "./ui/modal";
+import { showHeroSelect } from "./ui/hero-select";
+import { hasChosenHero } from "./game/heroes";
 import { getState, setState, subscribe, resetState } from "./game/store";
 import * as economy from "./game/economy";
 import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, dockAt, undock } from "./game/economy";
@@ -60,6 +66,7 @@ import { getPlayerHp, damagePlayer, resetPlayerHp, updatePlayerCombat } from "./
 import { save, load, clearSave } from "./game/save";
 import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
 import { t, getLang, toggleLang, onLangChange, applyStaticI18n } from "./core/i18n";
+import { gameAudio } from "./core/audio";
 import { initPresence, presenceDebug } from "./net/presence";
 import { initRemoteShips, updateRemoteShips } from "./net/remote-ships";
 import {
@@ -239,7 +246,7 @@ function goAshore() {
     if (getState().hull > beforeHull) {
       const portName = t(`port.${dock.id}`);
       showToast(t("toast.hullRepaired", { port: portName }));
-      postChat(t("npc.shipwright"), t("chat.hullRepaired", { port: portName }));
+      postChatT("npc.shipwright", "chat.hullRepaired", { port: { key: `port.${dock.id}` } });
     }
   }
   mode = "walking";
@@ -251,6 +258,7 @@ function goAshore() {
   playerState.heading = shipState.heading;
   playerState.speed = 0;
   player.visible = true;
+  gameAudio.play("dock");
 }
 
 function boardShip() {
@@ -258,6 +266,7 @@ function boardShip() {
   player.visible = false;
   setState(undock(getState()));
   save(getState(), shipSnapshot());
+  gameAudio.play("board");
 }
 
 // 劈碎货箱的战利品直接进金库（+2 gold/箱）
@@ -331,7 +340,8 @@ function strand() {
   shipState.targetSpeed = 0;
   mode = "sailing";
   player.visible = false;
-  postChat(t("npc.harbormaster"), t("strand.chat", { fee: STRAND_TOW_FEE }));
+  gameAudio.play("hurt", { volume: 1.2, rate: 0.82 });
+  postChatT("npc.harbormaster", "strand.chat", { fee: STRAND_TOW_FEE });
   showModal({
     eyebrow: t("strand.eyebrow"),
     title: t("strand.title"),
@@ -366,6 +376,7 @@ function fireHarpoon() {
   }
   if (!target) {
     showToast(t("harpoon.noTarget"));
+    gameAudio.play("uiError");
     harpoonCooldown = 0.3;
     return;
   }
@@ -375,6 +386,7 @@ function fireHarpoon() {
   mesh.position.y += 16;
   scene.add(mesh);
   bolts.push({ mesh, target });
+  gameAudio.play("harpoon");
 }
 
 function updateBolts(delta: number) {
@@ -392,6 +404,7 @@ function updateBolts(delta: number) {
         const crit = stats.harpoonCritChance > 0 && Math.random() < stats.harpoonCritChance;
         const died = damageWorm(bolt.target, stats.harpoonDamage * (crit ? 2 : 1));
         spawnSplinters(new THREE.Vector3(targetPos.x, bolt.mesh.position.y, targetPos.z));
+        gameAudio.play("metalHit", { volume: crit ? 1.3 : 1, rate: crit ? 0.82 : 1 });
         if (died) {
           // 经济铁律：赏金极少，主产出是虫鳞（材料入舱，经贸易变现）
           const scaleQty = randInt(WORM_SCALE_DROP_MIN, WORM_SCALE_DROP_MAX);
@@ -404,7 +417,8 @@ function updateBolts(delta: number) {
           setState(next);
           const lootNote = looted < scaleQty ? t("worm.lootLost", { n: scaleQty - looted }) : "";
           showToast(t("worm.slain", { gold: WORM_BOUNTY, scales: looted, note: lootNote }));
-          postChat(t("npc.lookout"), t("worm.slainChat", { gold: WORM_BOUNTY, scales: looted }));
+          postChatT("npc.lookout", "worm.slainChat", { gold: WORM_BOUNTY, scales: looted });
+          gameAudio.play("victory");
         } else {
           showToast(`${crit ? t("worm.crit") : ""}${t("worm.hit", { hp: bolt.target.hp })}`);
         }
@@ -424,6 +438,19 @@ const hitProbe = new THREE.Vector3();
 const crateWorldPos = new THREE.Vector3();
 const marketProbe = new THREE.Vector3();
 const treasureProbe = new THREE.Vector3(TREASURE_X, 0, TREASURE_Z);
+let nextFootstepAt = 0;
+
+function updateFootsteps(elapsed: number) {
+  const speed = Math.abs(playerState.speed);
+  if (!playerState.grounded || speed < 8) {
+    nextFootstepAt = elapsed;
+    return;
+  }
+  if (elapsed < nextFootstepAt) return;
+  const stride = THREE.MathUtils.lerp(0.46, 0.28, THREE.MathUtils.clamp(speed / 62, 0, 1));
+  nextFootstepAt = elapsed + stride;
+  gameAudio.play("sandStep");
+}
 
 // 步行时最近的可交易集市（帐篷前 48 单位内）
 function findNearbyMarket() {
@@ -454,6 +481,7 @@ function tryBreakCrates() {
       crate.visible = false;
       spawnSplinters(crateWorldPos);
       setState(next);
+      gameAudio.play("crateBreak");
     }
   }
 }
@@ -470,6 +498,7 @@ function tryHitCrabs() {
     if (distance > MELEE_RANGE) continue;
     const died = damageCrab(agent, getDerivedStats(getState()).meleeDamage);
     spawnSplinters(agent.position.clone().setY(8));
+    gameAudio.play("metalHit", { volume: died ? 1.15 : 0.9 });
     if (died) {
       const chitinQty = randInt(CRAB_CHITIN_DROP_MIN, CRAB_CHITIN_DROP_MAX);
       const { state: next, looted } = economy.recordCrabKill(
@@ -480,6 +509,7 @@ function tryHitCrabs() {
       );
       setState(next);
       showToast(t("crab.slain", { gold: CRAB_BOUNTY, loot: looted }));
+      gameAudio.play("victory", { volume: 0.75 });
     } else {
       showToast(t("crab.hit", { hp: agent.hp }));
     }
@@ -492,7 +522,8 @@ function playerDown() {
   playerState.position.set(port.marketX + 24, 0, port.marketZ + 24);
   playerState.speed = 0;
   resetPlayerHp();
-  postChat(t("npc.harbormaster"), t("player.downChat"));
+  gameAudio.play("hurt", { volume: 1.1, rate: 0.86 });
+  postChatT("npc.harbormaster", "player.downChat");
   showToast(t("player.downToast"));
 }
 
@@ -512,6 +543,14 @@ initMinimap();
 initQuests();
 initChat();
 initControlsHint();
+// 指针锁定：点击画布/首个 WASD 键锁定（鼠标隐藏、移动即转镜头），Esc 释放。
+// 触屏不适用；交易/弹窗/聊天占用时不允许锁定。锁定态提示由快捷键条每帧读取。
+initPointerLock(
+  canvas,
+  () => !coarsePointer && !isModalOpen() && !isTradePanelOpen() && !isKeyCaptured(),
+  () => {},
+);
+gameAudio.init();
 
 // 鼠标拖拽旋转镜头（yaw 环绕 / pitch 俯仰），航行与步行共用
 const cameraOrbit = { yaw: 0, pitch: 0 };
@@ -536,7 +575,10 @@ function syncLangButton() {
 
 applyStaticI18n();
 syncLangButton();
-langButton?.addEventListener("click", () => toggleLang());
+langButton?.addEventListener("click", () => {
+  gameAudio.play("uiSelect");
+  toggleLang();
+});
 onLangChange(syncLangButton);
 
 // 启动流程：解析钱包身份（无登录门，访客直接玩）→ 载入该身份的存档 → 起引擎。
@@ -557,10 +599,10 @@ function startGame() {
   if (isWalletLinked()) {
     const eyebrow = document.querySelector(".brand-title .eyebrow");
     if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
-    postChat(t("npc.harbormaster"), t("wallet.linked", { id: shortIdentity() }));
+    postChatT("npc.harbormaster", "wallet.linked", { id: shortIdentity() });
   }
   // 试玩删档提示：常驻横幅（index.html）之外，开局在频道里再播报一次
-  postChat(t("npc.harbormaster"), t("trial.chat"));
+  postChatT("npc.harbormaster", "trial.chat");
 
   initPresence(() => (mode === "walking" ? "walking" : "sailing"));
 
@@ -618,6 +660,7 @@ function animate() {
     clearFramePresses();
     worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
     crabs.forEach((rig, index) => updateCrab(rig, crabAgents[index], elapsed));
+    gameAudio.update(delta, { mode, speed: shipState.speed, inMenu: true });
     updateHud(getState(), shipState.speed, ship.position);
     renderer.render(scene, camera);
     return;
@@ -627,8 +670,9 @@ function animate() {
   const bitten = updateWormAi(delta, mode === "sailing");
   if (bitten) {
     const remaining = getState().hull;
+    gameAudio.play("hurt", { volume: 1.15, rate: 0.78 });
     showToast(t("worm.bite", { hull: remaining }));
-    postChat(t("npc.lookout"), t("worm.biteChat", { hull: remaining }));
+    postChatT("npc.lookout", "worm.biteChat", { hull: remaining });
     if (remaining <= 0) strand();
   }
 
@@ -638,6 +682,7 @@ function animate() {
   updatePlayerCombat(delta);
   if (pinches > 0) {
     const remaining = damagePlayer(CRAB_DAMAGE * pinches);
+    gameAudio.play("hurt", { volume: Math.min(1.25, 0.8 + pinches * 0.2) });
     showToast(t("crab.pinch", { hp: remaining }));
     if (remaining <= 0) playerDown();
   }
@@ -654,6 +699,7 @@ function animate() {
       } else if (elapsed - noWeaponHintAt > 4) {
         // 未装备武器时点击：指引去船坞购置（4s 节流防刷屏）
         noWeaponHintAt = elapsed;
+        gameAudio.play("uiError");
         showToast(t("harpoon.notMounted", { cost: HARPOON_COST }));
       }
     }
@@ -666,9 +712,11 @@ function animate() {
     if (consumePressed("KeyE") || consumePressed("Escape")) closeTradePanel();
   } else {
     updatePlayer(player, delta, elapsed, ship.position);
+    updateFootsteps(elapsed);
     updateCameraOrbit();
     updateWalkCamera(camera, player, delta, cameraOrbit);
     if (consumeClick() && startAttack()) {
+      gameAudio.play("attack");
       tryBreakCrates();
       tryHitCrabs();
     }
@@ -690,7 +738,8 @@ function animate() {
     );
     if (nearTreasure && consumePressed("KeyE")) {
       setState(openTreasure(state));
-      postChat(t("npc.harbormaster"), t("treasure.chat"));
+      gameAudio.play("treasure");
+      postChatT("npc.harbormaster", "treasure.chat");
       showModal({
         eyebrow: t("treasure.eyebrow"),
         title: t("treasure.title"),
@@ -722,8 +771,22 @@ function animate() {
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
   updateHud(getState(), shipState.speed, ship.position);
   updatePlayerHpChip(getPlayerHp(), PLAYER_MAX_HP, mode === "walking");
-  updateControlsHint(mode, getState().harpoon);
+  // UI 面板打开时释放指针锁定（玩家需要光标点按钮）
+  if (isPointerLocked() && (isModalOpen() || isTradePanelOpen() || isKeyCaptured())) {
+    exitPointerLock();
+  }
+  updateControlsHint(mode, getState().harpoon, coarsePointer ? "none" : isPointerLocked() ? "locked" : "free");
   updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", wormAgents, elapsed);
+  gameAudio.update(delta, {
+    mode,
+    speed: shipState.speed,
+    inMenu: isTradePanelOpen(),
+    danger:
+      bitten ||
+      pinches > 0 ||
+      wormAgents.some((agent) => agent.mode === "chase" || agent.mode === "bite") ||
+      crabAgents.some((agent) => agent.mode === "chase" || agent.mode === "attack"),
+  });
   renderer.render(scene, camera);
 }
 
@@ -736,6 +799,10 @@ function removeBootOverlay() {
   if (overlay) {
     overlay.style.opacity = "0";
     setTimeout(() => overlay.remove(), 420);
+  }
+  // 首次进游戏先选船长；Playwright（webdriver）下跳过以免挡住自动化用例
+  if (!hasChosenHero() && !navigator.webdriver) {
+    showHeroSelect();
   }
 }
 

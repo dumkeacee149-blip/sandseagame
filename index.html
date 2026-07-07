@@ -15,6 +15,26 @@
     />
     <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // 官网优先：首次访问先看落地页，从官网 Play(?play=1) 或回头客直接进游戏。
+      // Playwright（webdriver）与带 presence 参数的多人测试直连不拦。
+      (function () {
+        try {
+          var KEY = "sandsea-seen-landing";
+          var params = new URLSearchParams(location.search);
+          if (navigator.webdriver || params.has("presence")) return;
+          if (params.has("play")) {
+            localStorage.setItem(KEY, "1");
+            return;
+          }
+          if (!localStorage.getItem(KEY)) {
+            location.replace("/landing.html");
+          }
+        } catch (e) {
+          // localStorage 不可用时不守门，直接进游戏
+        }
+      })();
+    </script>
     <style>
       /* 首屏 Loading：内联样式保证 HTML 一到即显示（three 包体在慢链路可能要几秒） */
       #boot-overlay {

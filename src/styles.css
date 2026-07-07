@@ -994,3 +994,63 @@ span.skill-cell {
   outline: 2px solid var(--brass-bright);
   outline-offset: 1px;
 }
+
+/* ---------- 选船长面板 ---------- */
+.hero-select-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 12, 4, 0.62);
+}
+
+.hero-select-panel {
+  width: min(430px, calc(100vw - 40px));
+  padding: 22px 26px 26px;
+  text-align: center;
+  color: var(--cream);
+}
+
+.hero-select-canvas {
+  display: block;
+  margin: 10px auto 4px;
+  width: 250px;
+  height: 280px;
+}
+
+.hero-select-chips {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* 提高特异性盖过 .trade-actions button 的金色底，未选中船长保持暗色 */
+.hero-chip,
+.trade-actions button.hero-chip {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(24, 14, 5, 0.85);
+  background: linear-gradient(172deg, rgba(74, 51, 28, 0.9), rgba(43, 29, 16, 0.9));
+  color: rgba(246, 236, 210, 0.85);
+  font-family: var(--body);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hero-chip-active,
+.trade-actions button.hero-chip-active {
+  background: linear-gradient(178deg, var(--brass-bright), var(--brass));
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (max-height: 560px) {
+  .hero-select-canvas {
+    width: 180px;
+    height: 200px;
+  }
+}

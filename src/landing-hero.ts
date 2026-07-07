@@ -9,9 +9,17 @@ import {
 } from "./world/sky";
 import { createVoxelAsset } from "./voxel-assets";
 import { hunyuanSlot } from "./core/models";
+import {
+  createOasisPort,
+  createRuins,
+  createSaltFlats,
+  createSeaScatter,
+  createDistantCaravans,
+  createSaltcrestCamp,
+} from "./world/landmarks";
 
-// 官网 hero 实时场景：复用游戏本体的天空/云/地形/沙船模块，
-// 沙船绕开阔沙海缓航一圈，镜头慢速环绕——官网首屏即游戏实景。
+// 官网 hero 实时场景：复用游戏本体的天空/云/地形/沙船与各地标模块，
+// 沙船沿"绿洲港→商队→盐滩→遗迹"的巡航线环游，镜头跟随——官网首屏即游戏实景。
 const canvas = document.getElementById("hero-canvas") as HTMLCanvasElement | null;
 
 if (canvas) {
@@ -53,9 +61,31 @@ function initHero(heroCanvas: HTMLCanvasElement) {
   const ship = hunyuanSlot(shipPlaceholder, "/models/skiff.glb", Math.PI / 2);
   scene.add(ship);
 
-  // 航线：开阔沙海中心的慢速环线（避开四座岛屿台地）
-  const ROUTE_RADIUS = 300;
-  const ROUTE_SPEED = 0.05; // 弧度/秒
+  // 游戏本体的地标：港口小镇/遗迹/盐滩/商队/礁岩，让首屏看到的就是玩家会去的地方
+  scene.add(createOasisPort());
+  scene.add(createRuins());
+  scene.add(createSaltFlats());
+  scene.add(createSaltcrestCamp());
+  scene.add(createSeaScatter());
+  scene.add(createDistantCaravans());
+
+  // 航线：贴着各地标的环游巡航线（顺序：绿洲港→商队→盐滩→盐脊营→遗迹→回程），
+  // 航点都留在沙海开阔带，避开台地与礁岩碰撞半径
+  const route = new THREE.CatmullRomCurve3(
+    [
+      new THREE.Vector3(60, 0, -420),
+      new THREE.Vector3(-420, 0, -140),
+      new THREE.Vector3(-380, 0, 320),
+      new THREE.Vector3(-100, 0, 520),
+      new THREE.Vector3(250, 0, 560),
+      new THREE.Vector3(520, 0, 260),
+      new THREE.Vector3(420, 0, -160),
+    ],
+    true,
+    "centripetal",
+  );
+  const ROUTE_LENGTH = route.getLength();
+  const ROUTE_SPEED = 24; // 世界单位/秒，跑完全程约 100s，每 ~15s 换一处景
 
   // 鼠标视差：轻微偏转镜头朝向，落地页常见的"活"感
   const parallax = { x: 0, y: 0 };
@@ -84,20 +114,21 @@ function initHero(heroCanvas: HTMLCanvasElement) {
 
   // three 0.183 已弃用 Clock（每帧刷警告），手动记时间戳
   let lastTime = performance.now();
-  let elapsed = 0;
+  // 起点定在驶过绿洲港的一段：首帧即见港口小镇，而非空旷启程段
+  let elapsed = 20;
   let revealed = false;
 
   const renderFrame = () => {
-    const angle = elapsed * ROUTE_SPEED;
-    const shipX = Math.cos(angle) * ROUTE_RADIUS;
-    const shipZ = Math.sin(angle) * ROUTE_RADIUS;
-    // 航向与圆周切线一致（游戏前进方向约定：forward = (cos h, -sin h)）
-    const heading = -angle - Math.PI / 2;
+    const t = ((elapsed * ROUTE_SPEED) / ROUTE_LENGTH) % 1;
+    const point = route.getPointAt(t);
+    const tangent = route.getTangentAt(t);
+    // 航向与航线切线一致（游戏前进方向约定：forward = (cos h, -sin h)）
+    const heading = Math.atan2(-tangent.z, tangent.x);
 
     ship.position.set(
-      shipX,
-      surfaceHeight(shipX, shipZ) + 1.2 + Math.sin(elapsed * 4) * 0.9,
-      shipZ,
+      point.x,
+      surfaceHeight(point.x, point.z) + 1.2 + Math.sin(elapsed * 4) * 0.9,
+      point.z,
     );
     ship.rotation.y = heading;
     ship.rotation.x = Math.sin(elapsed * 2.6) * 0.025;
@@ -127,7 +158,6 @@ function initHero(heroCanvas: HTMLCanvasElement) {
 
   if (reducedMotion) {
     // 尊重减少动效偏好：出一帧静态实景即可
-    elapsed = 12;
     renderFrame();
     return;
   }
@@ -139,7 +169,8 @@ function initHero(heroCanvas: HTMLCanvasElement) {
     const now = performance.now();
     const delta = (now - lastTime) / 1000;
     lastTime = now;
-    if (document.hidden || !heroVisible) return;
+    // 隐藏标签页浏览器本身会暂停 rAF，这里只需管首屏滚出视口的情况
+    if (!heroVisible) return;
     elapsed += Math.min(delta, 0.1);
     renderFrame();
   });

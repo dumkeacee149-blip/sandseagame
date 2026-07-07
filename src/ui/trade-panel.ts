@@ -6,7 +6,6 @@ import {
   SKILL_BRANCHES,
   UPGRADES,
   TREASURE_MAP_COST,
-  TOKEN_RATE,
   HARPOON_COST,
   OUTFIT_COLORS,
   cargoCapacity,
@@ -21,7 +20,6 @@ import {
   buyTreasureMap,
   buyHarpoon,
   setOutfit,
-  exchangeTokens,
   unitBuyPrice,
   unitSellPrice,
   buyItem,
@@ -33,13 +31,12 @@ import {
   skillPointsAvailable,
 } from "../game/economy";
 import { getState, setState, subscribe } from "../game/store";
-import { applyOutfit } from "../game/player";
+import { applyOutfit, setHero } from "../game/player";
+import { HERO_IDS, type HeroId, getSelectedHero, setSelectedHero } from "../game/heroes";
 import { t, onLangChange } from "../core/i18n";
+import { gameAudio, type SoundCue } from "../core/audio";
 
 const UPGRADE_IDS: readonly UpgradeId[] = ["sail", "cargo", "hull"];
-
-// 兑换代币功能暂不显示，等待后面迭代开放
-const SHOW_TOKEN_EXCHANGE = false;
 
 let panelEl: HTMLDivElement | null = null;
 let currentPort: PortId | null = null;
@@ -53,11 +50,21 @@ export function openTradePanel(portId: PortId) {
   ensurePanel();
   render(getState());
   if (panelEl) panelEl.hidden = false;
+  gameAudio.play("uiOpen");
 }
 
 export function closeTradePanel() {
+  if (!currentPort) return;
   currentPort = null;
   if (panelEl) panelEl.hidden = true;
+  gameAudio.play("uiClose");
+}
+
+function commitState(mutate: (state: GameState) => GameState, cue: SoundCue) {
+  const before = getState();
+  const next = mutate(before);
+  setState(next);
+  gameAudio.play(next === before ? "uiError" : cue);
 }
 
 function ensurePanel() {
@@ -72,63 +79,72 @@ function ensurePanel() {
   panelEl.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-action]");
     if (!button || !currentPort) return;
+    const portId = currentPort;
     const action = button.dataset.action;
     if (action === "close") {
       closeTradePanel();
       return;
     }
     if (action === "upgrade") {
-      setState(buyUpgrade(getState(), button.dataset.upgrade as UpgradeId));
+      commitState((state) => buyUpgrade(state, button.dataset.upgrade as UpgradeId), "coins");
       return;
     }
     if (action === "treasure-map") {
-      setState(buyTreasureMap(getState()));
+      commitState(buyTreasureMap, "treasure");
       return;
     }
     if (action === "harpoon") {
-      setState(buyHarpoon(getState()));
+      commitState(buyHarpoon, "equip");
+      return;
+    }
+    if (action === "hero") {
+      // 换船长是纯外观（localStorage），不走 GameState；手动重绘刷新高亮
+      const hero = button.dataset.hero as HeroId;
+      const changed = hero !== getSelectedHero();
+      setSelectedHero(hero);
+      setHero(hero);
+      render(getState());
+      gameAudio.play(changed ? "equip" : "uiSelect");
       return;
     }
     if (action === "outfit") {
       const slot = button.dataset.slot as keyof OutfitState;
       const color = button.dataset.color ?? "";
-      const next = setOutfit(getState(), slot, color);
+      const before = getState();
+      const next = setOutfit(before, slot, color);
       setState(next);
       applyOutfit(next.outfit);
-      return;
-    }
-    if (action === "exchange") {
-      setState(exchangeTokens(getState(), 1));
+      gameAudio.play(next === before ? "uiSelect" : "equip");
       return;
     }
     if (action === "item-buy") {
-      setState(buyItem(getState(), button.dataset.item as ItemId));
+      commitState((state) => buyItem(state, button.dataset.item as ItemId), "coins");
       return;
     }
     if (action === "item-craft") {
-      setState(craftItem(getState(), button.dataset.item as ItemId));
+      commitState((state) => craftItem(state, button.dataset.item as ItemId), "equip");
       return;
     }
     if (action === "item-sell") {
-      setState(sellItemBack(getState(), button.dataset.item as ItemId));
+      commitState((state) => sellItemBack(state, button.dataset.item as ItemId), "coins");
       return;
     }
     if (action === "item-equip") {
-      setState(equipItem(getState(), button.dataset.item as ItemId));
+      commitState((state) => equipItem(state, button.dataset.item as ItemId), "equip");
       return;
     }
     if (action === "item-unequip") {
-      setState(unequipSlot(getState(), button.dataset.slot as EquipSlotId));
+      commitState((state) => unequipSlot(state, button.dataset.slot as EquipSlotId), "equip");
       return;
     }
     if (action === "skill") {
-      setState(unlockSkill(getState(), button.dataset.skill as SkillId));
+      commitState((state) => unlockSkill(state, button.dataset.skill as SkillId), "uiConfirm");
       return;
     }
     const good = button.dataset.good as GoodId;
     const qty = Number(button.dataset.qty ?? 1);
-    if (action === "buy") setState(buyGood(getState(), currentPort, good, qty));
-    if (action === "sell") setState(sellGood(getState(), currentPort, good, qty));
+    if (action === "buy") commitState((state) => buyGood(state, portId, good, qty), "coins");
+    if (action === "sell") commitState((state) => sellGood(state, portId, good, qty), "coins");
   });
 
   subscribe((state) => {
@@ -276,7 +292,18 @@ function render(state: GameState) {
       </div>`;
   }).join("");
 
-  // 更衣室：三槽六色
+  // 更衣室：换船长 + 三槽六色
+  const selectedHero = getSelectedHero();
+  const heroChips = HERO_IDS.map(
+    (hero) =>
+      `<button class="hero-chip ${hero === selectedHero ? "hero-chip-active" : ""}" data-action="hero" data-hero="${hero}">${t(`hero.${hero}`)}</button>`,
+  ).join("");
+  const heroRow = `
+      <div class="trade-row">
+        <div class="trade-good"><b>${t("hero.slot")}</b></div>
+        <div class="trade-actions trade-upgrade">${heroChips}</div>
+      </div>`;
+
   const outfitSlots: Array<{ slot: keyof OutfitState; label: string }> = [
     { slot: "bandana", label: t("outfit.bandana") },
     { slot: "cloth", label: t("outfit.cloth") },
@@ -311,23 +338,11 @@ function render(state: GameState) {
       </div>`
       : "";
 
-  // 金库兑换：金币 → $SAND（预发布记账，TGE 后接链上结算）
-  const exchangeRow = !SHOW_TOKEN_EXCHANGE
-    ? ""
-    : `
-      <p class="trade-eyebrow trade-section">Token Vault</p>
-      <div class="trade-row">
-        <div class="trade-good"><b>$SAND Ledger</b><span>holding ${state.tokens} · pre-launch ledger, settles on-chain at token launch</span></div>
-        <div class="trade-actions trade-upgrade">
-          <button data-action="exchange" ${state.gold >= TOKEN_RATE ? "" : "disabled"}>Exchange · ${TOKEN_RATE}g → 1 $SAND</button>
-        </div>
-      </div>`;
-
   panelEl.innerHTML = `
     <div class="trade-head">
       <div>
         <p class="trade-eyebrow">${t("trade.market", { port: t(`port.${port.id}`) })}</p>
-        <p class="trade-stats">${t("trade.stats", { gold: state.gold, held, cap: capacity, tokens: state.tokens })}</p>
+        <p class="trade-stats">${t("trade.stats", { gold: state.gold, held, cap: capacity })}</p>
       </div>
       <button data-action="close" class="trade-close" aria-label="Close">✕</button>
     </div>
@@ -340,8 +355,8 @@ function render(state: GameState) {
     <p class="trade-eyebrow trade-section">${t(points === 1 ? "skills.title.one" : "skills.title.many", { points })}</p>
     ${skillRows}
     <p class="trade-eyebrow trade-section">${t("outfit.title")}</p>
+    ${heroRow}
     ${outfitRows}
     ${treasureRow}
-    ${exchangeRow}
     <p class="trade-hint">${t("trade.leave")}</p>`;
 }

@@ -70,8 +70,6 @@ export const PORTS: readonly PortDef[] = [
 export const PROMPT_RADIUS = 200;
 export const DOCK_RADIUS = 130;
 export const START_GOLD = 0;
-// 金币兑换代币汇率（预发布记账；$SAND 上线后接链上结算）
-export const TOKEN_RATE = 1000;
 
 // 升级查表（不用公式派生：帆速 92/106/122/140 是沙虫追速 110 的分水岭设计）
 export interface UpgradeTier {
@@ -275,7 +273,7 @@ export interface GameState {
   readonly completedAwaySale: boolean;
   // 累计卖货所得（技能点里程碑依据）
   readonly tradeGold: number;
-  // 预发布代币记账（$SAND on Solana，TGE 后接链上）
+  // 历史代币记账（兑换功能已下线；字段保留以兼容老存档数据）
   readonly tokens: number;
   // 任务系统的进度统计
   readonly visited: readonly PortId[];
