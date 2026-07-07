@@ -17,7 +17,7 @@ export default defineConfig({
       // 多人测试用的本地 presence 服务器（与线上 Worker 共用 presence-core 逻辑）
       command: "node scripts/presence-test-server.mjs",
       port: 8790,
-      reuseExistingServer: true,
+      reuseExistingServer: false,
     },
   ],
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],

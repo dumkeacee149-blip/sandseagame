@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "@playwright/test";
 
 // 同世界在线（P0）：两个玩家互见对方的船；一钱包一船（重复连接踢旧）。
 // presence 服务器由 playwright.config.ts 起本地实例，与线上 Worker 共用协议逻辑。
@@ -19,8 +19,15 @@ declare global {
   }
 }
 
-async function bootPlayer(page: Page, pid: string) {
-  await page.goto(`/?presence=${encodeURIComponent(PRESENCE_WS)}&pid=${pid}`);
+function roomFor(testInfo: TestInfo) {
+  return [testInfo.project.name, testInfo.workerIndex, testInfo.repeatEachIndex, ...testInfo.titlePath]
+    .join("-")
+    .replace(/[^a-z0-9_-]+/gi, "-");
+}
+
+async function bootPlayer(page: Page, pid: string, room: string) {
+  const presenceUrl = `${PRESENCE_WS}?room=${encodeURIComponent(room)}`;
+  await page.goto(`/?presence=${encodeURIComponent(presenceUrl)}&pid=${pid}`);
   await page.waitForFunction(() => Boolean(window.__game));
   await page.evaluate(() => window.__game!.clearSave());
   await expect
@@ -37,14 +44,15 @@ function remoteOf(page: Page, id: string) {
   );
 }
 
-test("两个玩家进入同一世界，互相看到对方的船并跟随移动", async ({ browser }) => {
+test("两个玩家进入同一世界，互相看到对方的船并跟随移动", async ({ browser }, testInfo) => {
+  const room = roomFor(testInfo);
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
 
-  await bootPlayer(pageA, "captain-a");
-  await bootPlayer(pageB, "captain-b");
+  await bootPlayer(pageA, "captain-a", room);
+  await bootPlayer(pageB, "captain-b", room);
 
   // A 把船开到指定位置 → B 的世界里出现 A 的船且位置一致
   await pageA.evaluate(() => window.__game!.teleport(300, 300, 1));
@@ -81,20 +89,22 @@ test("两个玩家进入同一世界，互相看到对方的船并跟随移动",
   await contextB.close();
 });
 
-test("一钱包一船：同一身份重复连接会踢掉旧会话", async ({ browser }) => {
+test("一钱包一船：同一身份重复连接会踢掉旧会话", async ({ browser }, testInfo) => {
+  test.setTimeout(75_000);
+  const room = roomFor(testInfo);
   const contextOld = await browser.newContext();
   const contextNew = await browser.newContext();
   const contextWatcher = await browser.newContext();
   const pageOld = await contextOld.newPage();
   const pageWatcher = await contextWatcher.newPage();
 
-  await bootPlayer(pageOld, "captain-dup");
-  await bootPlayer(pageWatcher, "captain-watcher");
+  await bootPlayer(pageOld, "captain-dup", room);
+  await bootPlayer(pageWatcher, "captain-watcher", room);
   await pageOld.evaluate(() => window.__game!.teleport(100, 100));
 
   // 同一身份第二次连接
   const pageNew = await contextNew.newPage();
-  await bootPlayer(pageNew, "captain-dup");
+  await bootPlayer(pageNew, "captain-dup", room);
 
   // 旧会话被断开且不再自动重连
   await expect

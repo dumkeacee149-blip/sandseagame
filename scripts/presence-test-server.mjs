@@ -7,8 +7,21 @@ import { WebSocketServer } from "ws";
 import { PresenceCore, TICK_MS } from "../workers/presence/presence-core.js";
 
 const port = Number(process.env.PORT ?? 8790);
-const core = new PresenceCore();
-setInterval(() => core.tick(), TICK_MS);
+const rooms = new Map();
+
+function getRoom(roomId) {
+  const id = roomId || "default";
+  let core = rooms.get(id);
+  if (!core) {
+    core = new PresenceCore();
+    rooms.set(id, core);
+  }
+  return core;
+}
+
+setInterval(() => {
+  for (const core of rooms.values()) core.tick();
+}, TICK_MS);
 
 const httpServer = createServer((request, response) => {
   response.writeHead(200, { "content-type": "text/plain" });
@@ -17,7 +30,9 @@ const httpServer = createServer((request, response) => {
 
 const wss = new WebSocketServer({ server: httpServer, path: "/presence" });
 
-wss.on("connection", (socket) => {
+wss.on("connection", (socket, request) => {
+  const url = new URL(request.url ?? "/presence", `http://127.0.0.1:${port}`);
+  const core = getRoom(url.searchParams.get("room"));
   const conn = core.connect({
     send: (payload) => socket.send(payload),
     close: (code, reason) => socket.close(code, reason),
