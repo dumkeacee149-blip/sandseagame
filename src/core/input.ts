@@ -23,6 +23,10 @@ export function initInput() {
     if (captured) return;
     if (!event.repeat) pressed.add(event.code);
     keys.add(event.code);
+    // 首个移动键也尝试锁定指针（键盘算用户手势；浏览器拒绝就静默留给点击路径）
+    if (!event.repeat && (event.code === "KeyW" || event.code === "KeyA" || event.code === "KeyS" || event.code === "KeyD")) {
+      tryPointerLock();
+    }
   });
   window.addEventListener("keyup", (event) => keys.delete(event.code));
 }
@@ -69,6 +73,7 @@ export function consumePressed(code: string) {
 
 let clickPending = false;
 let dragging = false;
+let suppressCurrentClick = false;
 let dragDistance = 0;
 let lastX = 0;
 let lastY = 0;
@@ -85,7 +90,14 @@ export function initMouse() {
     lastY = event.clientY;
   });
   window.addEventListener("mousemove", (event) => {
-    if (!dragging || captured) return;
+    if (captured) return;
+    // 指针锁定：鼠标移动直接转镜头（FPS 式），不需要按住拖拽
+    if (isPointerLocked()) {
+      dragDX += event.movementX;
+      dragDY += event.movementY;
+      return;
+    }
+    if (!dragging) return;
     const dx = event.clientX - lastX;
     const dy = event.clientY - lastY;
     lastX = event.clientX;
@@ -96,14 +108,74 @@ export function initMouse() {
   });
   window.addEventListener("mouseup", (event) => {
     if (event.button !== 0) return;
+    if (suppressCurrentClick) {
+      suppressCurrentClick = false;
+      dragging = false;
+      return;
+    }
     if (captured || performance.now() < suppressClicksUntil) {
       dragging = false;
       return;
     }
-    // 位移小于阈值算点击（攻击），否则是拖拽旋转镜头
+    // 位移小于阈值算点击（攻击），否则是拖拽旋转镜头。
+    // 锁定态下 dragDistance 不累计（移动进了镜头通道），点击永远算攻击。
     if (dragging && dragDistance < 6) clickPending = true;
     dragging = false;
   });
+}
+
+// ===== 指针锁定：进入游戏后鼠标隐藏，移动即转镜头，Esc 释放 =====
+// 浏览器要求首次锁定必须来自用户手势：点击画布或首个 WASD 键触发。
+let lockTarget: HTMLElement | null = null;
+let lockAllowed: () => boolean = () => true;
+let lockChangeCallback: (locked: boolean) => void = () => {};
+// 锁定失败（权限受限/内核不支持）后停止尝试，回退拖拽模式且不再吞点击
+let lockUnavailable = false;
+
+export function isPointerLocked() {
+  return lockTarget !== null && document.pointerLockElement === lockTarget;
+}
+
+function tryPointerLock() {
+  if (!lockTarget || lockUnavailable || isPointerLocked() || captured || !lockAllowed()) return;
+  // 返回 Promise 的新版 API 因权限/手势不足会 reject——标记不可用，留给拖拽模式
+  const result = lockTarget.requestPointerLock() as unknown as Promise<void> | undefined;
+  result?.catch(() => {
+    lockUnavailable = true;
+  });
+}
+
+export function initPointerLock(target: HTMLElement, allowed: () => boolean, onChange: (locked: boolean) => void) {
+  lockTarget = target;
+  lockAllowed = allowed;
+  lockChangeCallback = onChange;
+  target.addEventListener(
+    "mousedown",
+    (event) => {
+      if (event.button !== 0 || lockUnavailable || isPointerLocked() || captured || !lockAllowed()) return;
+      suppressCurrentClick = true;
+      clickPending = false;
+      tryPointerLock();
+    },
+    { capture: true },
+  );
+  target.addEventListener("click", () => {
+    // 触屏/UI 打开/锁定不可用等场景直接放行，不干扰原有点击语义
+    if (lockUnavailable || isPointerLocked() || captured || !lockAllowed()) return;
+    tryPointerLock();
+    // 获取锁定的那次点击不算攻击
+    clickPending = false;
+  });
+  document.addEventListener("pointerlockchange", () => {
+    lockChangeCallback(isPointerLocked());
+  });
+  document.addEventListener("pointerlockerror", () => {
+    lockUnavailable = true;
+  });
+}
+
+export function exitPointerLock() {
+  if (isPointerLocked()) document.exitPointerLock();
 }
 
 // 左键单击（边沿触发），语义同 consumePressed；拖拽不算点击

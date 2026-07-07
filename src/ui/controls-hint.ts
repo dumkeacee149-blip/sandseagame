@@ -8,6 +8,8 @@ const MOUSE_LEFT_SVG = `<svg viewBox="0 0 14 20" fill="none" aria-hidden="true">
 const MOUSE_DRAG_SVG = `<svg viewBox="0 0 22 20" fill="none" aria-hidden="true"><rect x="5" y="1" width="12" height="18" rx="6" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 7 L1 10 L3.5 13" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M18.5 7 L21 10 L18.5 13" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
 
 type HintMode = "sailing" | "walking";
+// 指针锁定状态："locked"=已锁定（提示 Esc 释放）/"free"=未锁定（提示点击锁定）/"none"=触屏不适用
+export type PointerLockHint = "locked" | "free" | "none";
 
 let hintEl: HTMLElement | null = null;
 let lastKey = "";
@@ -20,7 +22,7 @@ function kbd(keys: string) {
   return `<kbd>${keys}</kbd>`;
 }
 
-function render(mode: HintMode, harpoon: boolean) {
+function render(mode: HintMode, harpoon: boolean, lock: PointerLockHint) {
   if (!hintEl) return;
   const chips =
     mode === "sailing"
@@ -41,6 +43,9 @@ function render(mode: HintMode, harpoon: boolean) {
           chip(kbd("E"), t("hint.interact")),
           chip(MOUSE_DRAG_SVG, t("hint.rotate")),
         ];
+  // 指针锁定提示放最前：已锁定教 Esc 释放，未锁定引导点击锁定
+  if (lock === "locked") chips.unshift(chip(kbd("Esc"), t("hint.escFree")));
+  else if (lock === "free") chips.unshift(chip(MOUSE_LEFT_SVG, t("hint.clickLock")));
   hintEl.innerHTML = chips.join("");
 }
 
@@ -52,10 +57,10 @@ export function initControlsHint() {
   });
 }
 
-// 每帧调用；内容只在 模式/鱼叉/语言 变化时重绘
-export function updateControlsHint(mode: HintMode, harpoon: boolean) {
-  const key = `${mode}:${harpoon}`;
+// 每帧调用；内容只在 模式/鱼叉/锁定态/语言 变化时重绘
+export function updateControlsHint(mode: HintMode, harpoon: boolean, lock: PointerLockHint = "none") {
+  const key = `${mode}:${harpoon}:${lock}`;
   if (key === lastKey) return;
   lastKey = key;
-  render(mode, harpoon);
+  render(mode, harpoon, lock);
 }
