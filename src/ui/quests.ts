@@ -1,6 +1,6 @@
 import type { GameState } from "../game/data";
 import { subscribe, getState, setState } from "../game/store";
-import { postChat } from "./chat";
+import { postChatT } from "./chat";
 import { t, onLangChange } from "../core/i18n";
 
 // 任务链：起始金币为 0，任务奖励是玩家的第一桶金（自动发放）。
@@ -51,7 +51,7 @@ function claimDueRewards() {
         gold: state.gold + next.reward,
         claimedQuests: [...state.claimedQuests, next.id],
       });
-      postChat(t("npc.quartermaster"), t("quest.complete", { text: t(`quest.${next.id}`), reward: next.reward }));
+      postChatT("npc.quartermaster", "quest.complete", { text: { key: `quest.${next.id}` }, reward: next.reward });
     }
   } finally {
     claiming = false;

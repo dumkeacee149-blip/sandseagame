@@ -4,7 +4,7 @@
 
 import { shipState } from "../game/ship-controller";
 import { createPresenceAuth, getIdentity, isWalletLinked, shortIdentity } from "../core/wallet";
-import { postChat } from "../ui/chat";
+import { postChatT } from "../ui/chat";
 import { t } from "../core/i18n";
 
 export type RemoteMode = "sailing" | "walking" | "docked";
@@ -111,12 +111,12 @@ function connect(url: string) {
     teardown();
     if (code === CLOSE_REPLACED) {
       stopped = true;
-      postChat(t("npc.harbormaster"), t("presence.replaced"));
+      postChatT("npc.harbormaster", "presence.replaced");
       return;
     }
     if (code === CLOSE_BAD_HELLO) {
       stopped = true;
-      postChat(t("npc.harbormaster"), t("presence.badHello"));
+      postChatT("npc.harbormaster", "presence.badHello");
       return;
     }
     scheduleReconnect(url);
@@ -135,13 +135,13 @@ async function sendHello() {
   } catch (error) {
     console.error("同世界钱包签名失败", error);
     stopped = true;
-    postChat(t("npc.harbormaster"), t("presence.signDeclined"));
+    postChatT("npc.harbormaster", "presence.signDeclined");
     socket?.close();
     return;
   }
   if (wallet && !auth && !import.meta.env.DEV) {
     stopped = true;
-    postChat(t("npc.harbormaster"), t("presence.cantSign"));
+    postChatT("npc.harbormaster", "presence.cantSign");
     socket?.close();
     return;
   }
@@ -159,7 +159,7 @@ function handleServerMessage(raw: string) {
   if (msg.t === "welcome" && typeof msg.id === "string") {
     selfId = msg.id;
     applySnapshot(Array.isArray(msg.players) ? msg.players : []);
-    postChat(t("npc.harbormaster"), t("presence.entered"));
+    postChatT("npc.harbormaster", "presence.entered");
     startSendLoop();
     return;
   }
