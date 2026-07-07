@@ -35,7 +35,8 @@ const ATTACK_DURATION = 0.6;
 const tempVec = new THREE.Vector3();
 const SHIP_COLLIDER_RADIUS = 34;
 
-// 混元骨骼主角（H01 v1 正版）：AnimationMixer 四态状态机；加载失败回退体素占位
+// KayKit Adventurers 兜帽游侠（CC0，kaylousberg.itch.io/kaykit-adventurers）：
+// AnimationMixer 四态状态机；加载失败回退体素占位
 let mixer: THREE.AnimationMixer | null = null;
 const actions: Record<string, THREE.AnimationAction> = {};
 let currentAction = "";
@@ -116,9 +117,10 @@ export function createPlayerAvatar() {
   placeholder.scale.setScalar(4.2);
   rig.add(placeholder);
 
-  loadRiggedModel("/models/hero_rigged.glb?v=blender-h01-v3")
+  loadRiggedModel("/models/hero_kaykit_rogue.glb?v=kaykit-adventurers-1")
     .then(({ scene: model, animations }) => {
-      // 朝向已实测核对：模型面朝 +Z 与游戏前进方向一致，无需旋转
+      // KayKit 角色自带全套武器道具网格，只留主手刀配合挥刀动画
+      stripUnusedProps(model);
       fitRiggedToPlaceholder(model, placeholder);
       rig.remove(placeholder);
       rig.add(model);
@@ -127,10 +129,12 @@ export function createPlayerAvatar() {
       collectOutfitMaterials(model);
       applyOutfit(pendingOutfit);
       mixer = new THREE.AnimationMixer(model);
-      for (const clip of animations) {
-        actions[clip.name] = mixer.clipAction(clip);
+      // KayKit 剪辑名 → 游戏四态状态机名
+      for (const [gameName, clipName] of Object.entries(CLIP_MAP)) {
+        const clip = animations.find((item) => item.name === clipName);
+        if (clip) actions[gameName] = mixer.clipAction(clip);
       }
-      const attackClip = animations.find((clip) => clip.name === "Attack");
+      const attackClip = animations.find((clip) => clip.name === CLIP_MAP.Attack);
       if (actions.Attack && attackClip) {
         actions.Attack.setLoop(THREE.LoopOnce, 1);
         // 完整挥刀动作压进出手时长

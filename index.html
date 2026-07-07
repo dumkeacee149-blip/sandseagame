@@ -99,7 +99,8 @@
       <ul id="chat-log"></ul>
       <input id="chat-input" maxlength="120" placeholder="Say something, Captain… (Enter)" data-i18n-placeholder="chat.placeholder" hidden autocomplete="off" />
     </div>
-    <div class="controls-hint" data-i18n="controls.hint">WASD move · E interact · Space jump · Click attack · Drag rotate · Enter chat</div>
+    <!-- 快捷键条内容由 ui/controls-hint.ts 按模式渲染（图标 + 键帽） -->
+    <div class="controls-hint" id="controls-hint"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

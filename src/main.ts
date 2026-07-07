@@ -43,6 +43,7 @@ import {
   applyOutfit,
 } from "./game/player";
 import { updateHud, updatePlayerHpChip } from "./ui/hud";
+import { initControlsHint, updateControlsHint } from "./ui/controls-hint";
 import { initQuests } from "./ui/quests";
 import { initChat, postChat } from "./ui/chat";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
@@ -70,6 +71,7 @@ import {
   DOCK_RADIUS,
   HARPOON_RANGE,
   HARPOON_COOLDOWN,
+  HARPOON_COST,
   WORM_BOUNTY,
   WORM_RESPAWN_SECONDS,
   WORM_SCALE_DROP_MIN,
@@ -347,6 +349,7 @@ type HarpoonBolt = { mesh: THREE.Mesh; target: WormAgent };
 const bolts: HarpoonBolt[] = [];
 const boltGeometry = new THREE.BoxGeometry(2.2, 2.2, 15);
 let harpoonCooldown = 0;
+let noWeaponHintAt = -Infinity;
 
 function fireHarpoon() {
   if (harpoonCooldown > 0) return;
@@ -508,6 +511,7 @@ initTouchControls();
 initMinimap();
 initQuests();
 initChat();
+initControlsHint();
 
 // 鼠标拖拽旋转镜头（yaw 环绕 / pitch 俯仰），航行与步行共用
 const cameraOrbit = { yaw: 0, pitch: 0 };
@@ -644,7 +648,15 @@ function animate() {
     updateCamera(camera, ship, delta, cameraOrbit);
     // 鱼叉炮：装备后航行中左键发射
     harpoonCooldown = Math.max(0, harpoonCooldown - delta);
-    if (consumeClick() && getState().harpoon) fireHarpoon();
+    if (consumeClick()) {
+      if (getState().harpoon) {
+        fireHarpoon();
+      } else if (elapsed - noWeaponHintAt > 4) {
+        // 未装备武器时点击：指引去船坞购置（4s 节流防刷屏）
+        noWeaponHintAt = elapsed;
+        showToast(t("harpoon.notMounted", { cost: HARPOON_COST }));
+      }
+    }
     const canGoAshore = Math.abs(shipState.speed) < 8;
     setAction(canGoAshore ? t("action.ashore") : null);
     if (canGoAshore && consumePressed("KeyE")) goAshore();
@@ -710,6 +722,7 @@ function animate() {
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
   updateHud(getState(), shipState.speed, ship.position);
   updatePlayerHpChip(getPlayerHp(), PLAYER_MAX_HP, mode === "walking");
+  updateControlsHint(mode, getState().harpoon);
   updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", wormAgents, elapsed);
   renderer.render(scene, camera);
 }

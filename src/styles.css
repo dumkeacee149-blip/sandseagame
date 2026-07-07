@@ -686,17 +686,55 @@ span.skill-cell {
   opacity: 1;
 }
 
-/* ---------- 操作速查 ---------- */
+/* ---------- 操作速查：模式化图标键帽条（内容由 controls-hint.ts 渲染） ---------- */
 .controls-hint {
   position: fixed;
   right: 16px;
   bottom: 14px;
-  color: rgba(246, 236, 210, 0.5);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 14px;
+  max-width: min(560px, 60vw);
+  color: rgba(246, 236, 210, 0.55);
   font-size: 0.66rem;
   letter-spacing: 0.06em;
   text-shadow: 0 1px 3px rgba(15, 8, 2, 0.9);
   pointer-events: none;
   z-index: 10;
+}
+
+.hint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.hint-chip kbd {
+  font-family: var(--body);
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--brass-bright);
+  background: rgba(36, 23, 8, 0.72);
+  border: 1px solid rgba(201, 151, 62, 0.4);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 3px 6px 2px;
+}
+
+.hint-chip svg {
+  width: 12px;
+  height: 17px;
+  color: var(--brass-bright);
+}
+
+.hint-warn {
+  color: #ff9d7e;
+}
+
+.hint-warn svg {
+  color: #ff9d7e;
 }
 
 /* ---------- 响应式 ---------- */
