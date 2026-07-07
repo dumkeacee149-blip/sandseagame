@@ -88,12 +88,10 @@ export function fitRiggedToPlaceholder(
   model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 }
 
+// 轻量模式仅在 ?lite=1 时启用（卡顿设备手动兜底）；触屏默认仍加载完整模型
 function shouldKeepLitePlaceholder() {
   try {
-    const params = new URLSearchParams(location.search);
-    if (params.get("quality") === "high" || params.get("hq") === "1") return false;
-    if (params.get("lite") === "1") return true;
-    return window.matchMedia("(pointer: coarse)").matches;
+    return new URLSearchParams(location.search).get("lite") === "1";
   } catch {
     return false;
   }

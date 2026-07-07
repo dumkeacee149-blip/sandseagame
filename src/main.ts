@@ -104,15 +104,16 @@ if (!canvas) {
 const searchParams = new URLSearchParams(window.location.search);
 const captureMode = searchParams.has("capture");
 
-// 触屏设备默认走轻量画质，保住帧率；桌面保留高画质。
+// 画质默认全开；?lite=1 是卡顿设备的手动兜底（同时降渲染质量并保留体素占位模型）
 const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+const liteMode = searchParams.get("lite") === "1";
 
 // WebGL 创建失败兜底：老设备/被禁用 WebGL 时给出明确提示而不是白屏
 function createRenderer(target: HTMLCanvasElement) {
   try {
     return new THREE.WebGLRenderer({
       canvas: target,
-      antialias: !coarsePointer,
+      antialias: !liteMode,
       alpha: false,
       powerPreference: "high-performance",
     });
@@ -126,8 +127,8 @@ function createRenderer(target: HTMLCanvasElement) {
 }
 
 const renderer = createRenderer(canvas);
-// 触屏设备用 1x 渲染分辨率：移动端瓶颈通常是填充率和抗锯齿。
-renderer.setPixelRatio(coarsePointer ? 1 : Math.min(window.devicePixelRatio, 2));
+// 触屏设备用较低渲染分辨率（填充率是移动端瓶颈）；lite 模式进一步降到 1x
+renderer.setPixelRatio(liteMode ? 1 : Math.min(window.devicePixelRatio, coarsePointer ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
