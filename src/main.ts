@@ -84,6 +84,7 @@ import {
   WORM_SCALE_DROP_MIN,
   WORM_SCALE_DROP_MAX,
   CRAB_DAMAGE,
+  WORM_PLAYER_DAMAGE,
   CRAB_BOUNTY,
   CRAB_RESPAWN_SECONDS,
   CRAB_CHITIN_DROP_MIN,
@@ -666,14 +667,20 @@ function animate() {
     return;
   }
 
-  // 沙虫 AI：攻击圈内的船与步行角色都会被持续追咬；咬击→红字提示；耐久归零→搁浅
+  // 沙虫 AI：攻击圈内的船与步行角色都会被持续追咬；
+  // 咬中船→扣船壳掉货，耐久归零搁浅；咬中步行角色→扣角色 HP，归零倒地
   const bitten = updateWormAi(delta, mode === "sailing");
-  if (bitten) {
+  if (bitten === "ship") {
     const remaining = getState().hull;
     gameAudio.play("hurt", { volume: 1.15, rate: 0.78 });
     showToast(t("worm.bite", { hull: remaining }));
     postChatT("npc.lookout", "worm.biteChat", { hull: remaining });
     if (remaining <= 0) strand();
+  } else if (bitten === "player") {
+    const remaining = damagePlayer(WORM_PLAYER_DAMAGE);
+    gameAudio.play("hurt", { volume: 1.15, rate: 0.78 });
+    showToast(t("worm.bitePlayer", { hp: remaining }));
+    if (remaining <= 0) playerDown();
   }
 
   // 沙蟹 AI：只袭击步行中的船长（交易面板打开时视为在集市安全区）
@@ -782,7 +789,7 @@ function animate() {
     speed: shipState.speed,
     inMenu: isTradePanelOpen(),
     danger:
-      bitten ||
+      bitten !== null ||
       pinches > 0 ||
       wormAgents.some((agent) => agent.mode === "chase" || agent.mode === "bite") ||
       crabAgents.some((agent) => agent.mode === "chase" || agent.mode === "attack"),

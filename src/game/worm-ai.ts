@@ -138,8 +138,11 @@ export function applySavedWormDeaths(records: readonly EnemyDeathRecord[]) {
   }
 }
 
-function updateAgent(agent: WormAgent, delta: number, sailing: boolean): boolean {
-  let bit = false;
+// 咬击结果：击中船（扣船壳掉货）或击中步行角色（扣角色 HP，由 main 结算）
+export type WormBiteTarget = "ship" | "player";
+
+function updateAgent(agent: WormAgent, delta: number, sailing: boolean): WormBiteTarget | null {
+  let bit: WormBiteTarget | null = null;
 
   switch (agent.mode) {
     case "dead": {
@@ -176,8 +179,9 @@ function updateAgent(agent: WormAgent, delta: number, sailing: boolean): boolean
       const turnRate = Math.max(CHASE_TURN_RATE, CHASE_SPEED / Math.max(distance * 0.45, 12));
       moveToward(agent, target.x, target.z, CHASE_SPEED, turnRate, delta);
       if (targetDistanceToWorm(agent, sailing) < BITE_RANGE) {
-        setState(applyWormBite(getState(), BITE_DAMAGE));
-        bit = true;
+        // 船上：咬船壳并掉货；步行：咬的是角色本人，船壳无损，HP 结算交给 main
+        if (sailing) setState(applyWormBite(getState(), BITE_DAMAGE));
+        bit = sailing ? "ship" : "player";
         agent.mode = "bite";
         agent.biteTimer = BITE_DURATION;
       }
@@ -218,11 +222,12 @@ function updateAgent(agent: WormAgent, delta: number, sailing: boolean): boolean
   return bit;
 }
 
-// 每帧驱动全部沙虫；返回本帧是否有咬击命中（main 做受击反馈）
-export function updateWormAi(delta: number, sailing: boolean): boolean {
-  let bit = false;
+// 每帧驱动全部沙虫；返回本帧咬中的目标类型（main 做受击反馈），无命中为 null
+export function updateWormAi(delta: number, sailing: boolean): WormBiteTarget | null {
+  let bit: WormBiteTarget | null = null;
   for (const agent of wormAgents) {
-    if (updateAgent(agent, delta, sailing)) bit = true;
+    const hit = updateAgent(agent, delta, sailing);
+    if (hit) bit = hit;
   }
   return bit;
 }
