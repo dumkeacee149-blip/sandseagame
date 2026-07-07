@@ -12,7 +12,8 @@
 已具备的联机基座：
 
 - `workers/chat`：Cloudflare Durable Object + WebSocket 广播（全服聊天），模式已验证。
-- `src/core/wallet.ts`：Solana 钱包公钥即玩家身份（客户端声明，未做签名验证）。
+- `src/core/wallet.ts`：Solana 钱包公钥即玩家身份；presence 握手要求钱包签名，
+  Worker 验签通过后才允许使用该公钥作为玩家 ID。
 - `src/game/ship-controller.ts`：船的逻辑状态就是 `{position(x,z), heading, speed}`，
   天然适合做低频快照同步。
 
@@ -40,7 +41,7 @@ presence 房间即可实现 P0**，不需要引入新厂商或专用游戏同步
 
 ```jsonc
 // 客户端 → 服务器
-{ "t": "hello", "name": "Captain", "wallet": "8f2k…Qz9d" }   // 连接后首条
+{ "t": "hello", "name": "Captain", "wallet": "8f2k…Qz9d", "auth": { "audience": "...", "timestamp": 178..., "nonce": "...", "signature": "..." } }   // 连接后首条
 { "t": "pos", "x": 340.2, "z": -512.8, "h": 1.57, "s": 92, "m": "sailing" }
 // m: "sailing" | "walking" | "docked"（步行/停靠时船静止，锚定在最后位置）
 
@@ -84,15 +85,15 @@ presence 房间即可实现 P0**，不需要引入新厂商或专用游戏同步
    - 步行/停靠模式（`m !== "sailing"`）：船锚定显示在最后位置（船不消失，
      符合"船是玩家资产"的世界观）。
 
-身份接线：`hello` 里带 `shortIdentity()`；聊天 Worker 后续同样接入该身份，
+身份接线：`hello` 里带钱包公钥、短昵称与签名认证；聊天 Worker 后续同样接入该身份，
 替换固定昵称 Captain。
 
 ## 六、边界与安全
 
 - P0 是**客户端权威**位置同步——纯视觉呈现可以接受。
-- 任何有经济意义的交互（交易、赏金、$SAND）**必须**升级到服务器权威 + 
-  Sign-in-with-Solana 签名验证（wallet.ts 里已注明此升级点），不得沿用
-  客户端声明身份。
+- presence 身份已做钱包签名验证，但 P0 仍是**客户端权威位置同步**。
+  任何有经济意义的交互（交易、赏金、$SAND）**必须**升级到服务器权威，
+  不得信任客户端提交的数值变化。
 - 远端船无碰撞，不能用来卡位/顶撞（防骚扰）。
 
 ## 七、里程碑

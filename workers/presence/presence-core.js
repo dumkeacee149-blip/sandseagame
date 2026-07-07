@@ -18,6 +18,12 @@ export const CLOSE_BAD_HELLO = 4003;
 
 const MODES = new Set(["sailing", "walking", "docked"]);
 const ID_PATTERN = /^[\w.-]{3,64}$/;
+const PRESENCE_AUTH_AUDIENCE = "sandsea-privateers-presence-v1";
+const AUTH_WINDOW_MS = 2 * 60 * 1000;
+const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,80}$/;
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const BASE58_INDEX = new Map([...BASE58_ALPHABET].map((char, index) => [char, index]));
 
 function clampNumber(value, min, max) {
   const n = Number(value);
@@ -33,32 +39,90 @@ function sanitizeName(raw) {
   return text || "Captain";
 }
 
+function decodeBase64(text) {
+  if (typeof text !== "string" || !BASE64_PATTERN.test(text)) return null;
+  try {
+    if (typeof atob === "function") {
+      const binary = atob(text);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    }
+    return Uint8Array.from(Buffer.from(text, "base64"));
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase58(text) {
+  if (typeof text !== "string" || text.length === 0) return null;
+  const bytes = [0];
+  for (const char of text) {
+    const value = BASE58_INDEX.get(char);
+    if (value === undefined) return null;
+    let carry = value;
+    for (let i = 0; i < bytes.length; i += 1) {
+      const next = bytes[i] * 58 + carry;
+      bytes[i] = next & 0xff;
+      carry = next >> 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  for (const char of text) {
+    if (char !== "1") break;
+    bytes.push(0);
+  }
+  return Uint8Array.from(bytes.reverse());
+}
+
+function buildPresenceAuthMessage(wallet, timestamp, nonce) {
+  return [
+    "Sandsea Privateers Presence",
+    `wallet=${wallet}`,
+    `audience=${PRESENCE_AUTH_AUDIENCE}`,
+    `timestamp=${timestamp}`,
+    `nonce=${nonce}`,
+  ].join("\n");
+}
+
 // transport: { send(text), close(code, reason) } —— 宿主适配 WebSocket
 export class PresenceCore {
-  constructor(now = () => Date.now()) {
-    this.now = now;
+  constructor(options = {}) {
+    if (typeof options === "function") {
+      this.now = options;
+      this.requireSignedWallets = false;
+    } else {
+      this.now = options.now ?? (() => Date.now());
+      this.requireSignedWallets = options.requireSignedWallets === true;
+    }
     this.sessions = new Map(); // id -> session
+    this.authNonces = new Map(); // wallet:nonce -> expiresAt
     this.guestSerial = 0;
   }
 
   // 每个连接调用一次；返回该连接的事件处理句柄
   connect(transport) {
-    const conn = { id: null, transport };
+    const conn = { id: null, transport, helloPending: false };
     return {
-      onMessage: (raw) => this.handleMessage(conn, raw),
+      onMessage: (raw) => {
+        void this.handleMessage(conn, raw);
+      },
       onClose: () => this.handleClose(conn),
     };
   }
 
-  handleMessage(conn, raw) {
+  async handleMessage(conn, raw) {
     let msg;
     try {
       msg = JSON.parse(raw);
     } catch {
       return;
     }
-    if (msg?.t === "hello" && conn.id === null) {
-      this.handleHello(conn, msg);
+    if (msg?.t === "hello" && conn.id === null && !conn.helloPending) {
+      conn.helloPending = true;
+      await this.handleHello(conn, msg);
+      conn.helloPending = false;
       return;
     }
     if (msg?.t === "pos" && conn.id !== null) {
@@ -66,11 +130,17 @@ export class PresenceCore {
     }
   }
 
-  handleHello(conn, msg) {
+  async handleHello(conn, msg) {
     const wallet = typeof msg.wallet === "string" ? msg.wallet : "";
-    const id = ID_PATTERN.test(wallet) && wallet !== "guest"
-      ? wallet
-      : `guest-${++this.guestSerial}-${Math.floor(this.now() % 100000)}`;
+    const hasWallet = ID_PATTERN.test(wallet) && wallet !== "guest";
+    if (hasWallet && this.requireSignedWallets) {
+      const ok = await this.verifyPresenceAuth(wallet, msg.auth);
+      if (!ok) {
+        conn.transport.close(CLOSE_BAD_HELLO, "bad wallet signature");
+        return;
+      }
+    }
+    const id = hasWallet ? wallet : `guest-${++this.guestSerial}-${Math.floor(this.now() % 100000)}`;
 
     const existing = this.sessions.get(id);
     if (!existing && this.sessions.size >= MAX_PLAYERS) {
@@ -101,6 +171,39 @@ export class PresenceCore {
       lastPosAt: 0,
     });
     this.safeSend(id, JSON.stringify({ t: "welcome", id, players: this.snapshotPlayers() }));
+  }
+
+  cleanupAuthNonces(now) {
+    for (const [key, expiresAt] of this.authNonces) {
+      if (expiresAt <= now) this.authNonces.delete(key);
+    }
+  }
+
+  async verifyPresenceAuth(wallet, auth) {
+    const now = this.now();
+    this.cleanupAuthNonces(now);
+    if (!auth || auth.audience !== PRESENCE_AUTH_AUDIENCE) return false;
+    const timestamp = Number(auth.timestamp);
+    if (!Number.isFinite(timestamp) || Math.abs(now - timestamp) > AUTH_WINDOW_MS) return false;
+    if (typeof auth.nonce !== "string" || !NONCE_PATTERN.test(auth.nonce)) return false;
+    const nonceKey = `${wallet}:${auth.nonce}`;
+    if (this.authNonces.has(nonceKey)) return false;
+
+    const publicKey = decodeBase58(wallet);
+    const signature = decodeBase64(auth.signature);
+    if (!publicKey || publicKey.length !== 32 || !signature || signature.length !== 64) return false;
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle) return false;
+
+    try {
+      const key = await subtle.importKey("raw", publicKey, { name: "Ed25519" }, false, ["verify"]);
+      const message = new TextEncoder().encode(buildPresenceAuthMessage(wallet, timestamp, auth.nonce));
+      const ok = await subtle.verify({ name: "Ed25519" }, key, signature, message);
+      if (ok) this.authNonces.set(nonceKey, now + AUTH_WINDOW_MS);
+      return ok;
+    } catch {
+      return false;
+    }
   }
 
   handlePos(id, msg) {

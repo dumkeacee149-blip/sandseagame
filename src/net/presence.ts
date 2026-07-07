@@ -3,7 +3,7 @@
 // 游戏保持单机行为。协议见 workers/presence/presence-core.js。
 
 import { shipState } from "../game/ship-controller";
-import { getIdentity, isWalletLinked, shortIdentity } from "../core/wallet";
+import { createPresenceAuth, getIdentity, isWalletLinked, shortIdentity } from "../core/wallet";
 import { postChat } from "../ui/chat";
 
 export type RemoteMode = "sailing" | "walking" | "docked";
@@ -27,6 +27,7 @@ const SEND_INTERVAL_MS = 125; // 8Hz
 const KEEPALIVE_MS = 4000; // 静止时的保活上报
 const MAX_SAMPLES = 20;
 const CLOSE_REPLACED = 4000;
+const CLOSE_BAD_HELLO = 4003;
 
 const remotePlayers = new Map<string, RemotePlayer>();
 
@@ -97,7 +98,7 @@ function connect(url: string) {
 
   socket.addEventListener("open", () => {
     reconnectAttempts = 0;
-    socket?.send(JSON.stringify({ t: "hello", name: displayName(), wallet: resolveWallet() }));
+    void sendHello();
   });
 
   socket.addEventListener("message", (event) => {
@@ -112,12 +113,39 @@ function connect(url: string) {
       postChat("Harbormaster", "Your captain set sail from another port — this session is ashore now.");
       return;
     }
+    if (code === CLOSE_BAD_HELLO) {
+      stopped = true;
+      postChat("Harbormaster", "Shared sandsea sign-in failed. Reconnect your wallet and try again.");
+      return;
+    }
     scheduleReconnect(url);
   };
   socket.addEventListener("close", onGone);
   socket.addEventListener("error", () => {
     // close 事件随后必到，这里不重复处理
   });
+}
+
+async function sendHello() {
+  const wallet = resolveWallet();
+  let auth = null;
+  try {
+    auth = await createPresenceAuth();
+  } catch (error) {
+    console.error("同世界钱包签名失败", error);
+    stopped = true;
+    postChat("Harbormaster", "Wallet signature was declined, so shared sandsea is offline for this session.");
+    socket?.close();
+    return;
+  }
+  if (wallet && !auth && !import.meta.env.DEV) {
+    stopped = true;
+    postChat("Harbormaster", "This wallet cannot sign presence messages, so shared sandsea is offline.");
+    socket?.close();
+    return;
+  }
+  if (socket?.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ t: "hello", name: displayName(), wallet, auth }));
 }
 
 function handleServerMessage(raw: string) {

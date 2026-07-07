@@ -1,11 +1,11 @@
 // Solana 钱包登录：注入式 provider（Phantom/Solflare/Backpack）连接做身份绑定。
-// 说明：当前为客户端身份绑定（publicKey 即玩家 ID，存档按钱包隔离）。
-// 真正的防伪登录（Sign-in-with-Solana 签名验证）需要后端配合，接服务器时升级。
+// 存档按钱包公钥隔离；presence 联机握手会额外要求钱包签名，防止冒名顶号。
 
 type SolanaProvider = {
   isPhantom?: boolean;
   publicKey: { toString(): string } | null;
   connect(options?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: { toString(): string } }>;
+  signMessage?(message: Uint8Array, display?: "utf8" | "hex"): Promise<{ signature: Uint8Array }>;
 };
 
 declare global {
@@ -17,6 +17,7 @@ declare global {
 }
 
 const REMEMBER_KEY = "sandsea-wallet";
+export const PRESENCE_AUTH_AUDIENCE = "sandsea-privateers-presence-v1";
 let identity = "guest";
 // 未链接钱包只能观看：仅登录门的观众入口置真；DEV 自动访客仍可玩（保测试链路）
 let spectatorEntry = false;
@@ -40,6 +41,57 @@ export function shortIdentity() {
 
 function findProvider(): SolanaProvider | null {
   return window.solana ?? window.solflare ?? window.backpack ?? null;
+}
+
+export type PresenceAuth = {
+  readonly audience: string;
+  readonly timestamp: number;
+  readonly nonce: string;
+  readonly signature: string;
+};
+
+function encodeBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.slice(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function encodeBase64Url(bytes: Uint8Array) {
+  return encodeBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function createNonce() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return encodeBase64Url(bytes);
+}
+
+export function buildPresenceAuthMessage(wallet: string, timestamp: number, nonce: string) {
+  return [
+    "Sandsea Privateers Presence",
+    `wallet=${wallet}`,
+    `audience=${PRESENCE_AUTH_AUDIENCE}`,
+    `timestamp=${timestamp}`,
+    `nonce=${nonce}`,
+  ].join("\n");
+}
+
+export async function createPresenceAuth(): Promise<PresenceAuth | null> {
+  if (!isWalletLinked()) return null;
+  const provider = findProvider();
+  if (!provider?.signMessage) return null;
+  const timestamp = Date.now();
+  const nonce = createNonce();
+  const message = buildPresenceAuthMessage(identity, timestamp, nonce);
+  const result = await provider.signMessage(new TextEncoder().encode(message), "utf8");
+  return {
+    audience: PRESENCE_AUTH_AUDIENCE,
+    timestamp,
+    nonce,
+    signature: encodeBase64(result.signature),
+  };
 }
 
 function buildGate(onResolve: () => void) {

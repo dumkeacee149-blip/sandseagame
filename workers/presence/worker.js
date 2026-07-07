@@ -7,7 +7,7 @@ import { PresenceCore, TICK_MS } from "./presence-core.js";
 
 export class PresenceRoom {
   constructor() {
-    this.core = new PresenceCore();
+    this.core = new PresenceCore({ requireSignedWallets: true });
     // DO 在有活跃 WebSocket 时常驻，10Hz tick 随实例生命周期运行
     setInterval(() => this.core.tick(), TICK_MS);
   }
@@ -36,6 +36,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/presence") {
+      // 生产当前有意固定到 global 单房；本地测试服务器才读取 ?room 做测试隔离。
       const room = env.PRESENCE_ROOM.get(env.PRESENCE_ROOM.idFromName("global"));
       return room.fetch(request);
     }
