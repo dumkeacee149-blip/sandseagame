@@ -12,6 +12,8 @@ declare global {
         gold: number;
         cargo: Record<string, number>;
         hull: number;
+        trades: number;
+        completedAwaySale: boolean;
         docking: { kind: "sailing" | "docked"; portId?: string };
       };
       setState(state: unknown): void;
@@ -19,6 +21,7 @@ declare global {
       boardShip(): void;
       clearSave(): void;
       getShipPos(): { x: number; z: number };
+      getHarpoonCooldown(): number;
       wormAi: {
         mode: "patrol" | "chase" | "bite" | "dive" | "return";
         position: { set(x: number, y: number, z: number): void };
@@ -80,6 +83,21 @@ test("WASD 航行：按 W 速度上升，松开回落", async ({ page }) => {
   await expect.poll(async () => Number(await page.locator("#speed").textContent()), { timeout: 8_000 }).toBeLessThan(3);
 });
 
+test("聊天框打开后点击画布关闭，不会把同一次点击当作鱼叉", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const g = window.__game!;
+    g.setState({ ...g.getState(), harpoon: true });
+  });
+
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await page.mouse.click(520, 520);
+  await expect(page.locator("#chat-input")).toBeHidden();
+  await page.waitForTimeout(180);
+  await expect.poll(async () => page.evaluate(() => window.__game!.getHarpoonCooldown())).toBe(0);
+});
+
 test("交易闭环：绿洲买枣椰 → Saltcrest 卖出，金币先减后增", async ({ page }) => {
   await boot(page);
   await seedTradingGold(page);
@@ -132,6 +150,55 @@ test("存档持久化：交易后刷新页面进度保留", async ({ page }) => 
   await page.waitForFunction(() => Boolean(window.__game));
   await expect(page.locator("#gold")).toHaveText("56");
   await expect(page.locator("#cargo")).toHaveText("1/8");
+});
+
+test("同港买卖两笔刷新后不会被迁移成异港售卖", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const g = window.__game!;
+    g.setState({
+      ...g.getState(),
+      gold: 100,
+      cargo: { ...g.getState().cargo, salt: 1 },
+      trades: 0,
+      completedAwaySale: false,
+    });
+    g.teleport(-520, -140, Math.PI);
+    g.goAshore();
+    g.teleportPlayer(-640, -400, Math.PI);
+  });
+
+  await pressKey(page, "KeyE");
+  await expect(page.locator("#trade-panel")).toBeVisible();
+  await page.locator('button[data-action="buy"][data-good="dates"][data-qty="1"]').click();
+  await page.locator('button[data-action="sell"][data-good="salt"][data-qty="1"]').click();
+  await expect.poll(async () => page.evaluate(() => window.__game!.getState().trades)).toBe(2);
+  await expect.poll(async () => page.evaluate(() => window.__game!.getState().completedAwaySale)).toBe(false);
+
+  await page.reload();
+  await page.waitForFunction(() => Boolean(window.__game));
+  await expect.poll(async () => page.evaluate(() => window.__game!.getState().completedAwaySale)).toBe(false);
+});
+
+test("老档缺 completedAwaySale 且 trades>=2 时只在迁移中回填", async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    const state = { ...(window.__game!.getState() as Record<string, unknown>), trades: 2 };
+    delete state.completedAwaySale;
+    localStorage.setItem(
+      "sandsea-save:guest",
+      JSON.stringify({
+        version: 1,
+        state,
+        ship: { x: 0, z: 0, heading: 0 },
+        savedAt: new Date().toISOString(),
+      }),
+    );
+  });
+
+  await page.reload();
+  await page.waitForFunction(() => Boolean(window.__game));
+  await expect.poll(async () => page.evaluate(() => window.__game!.getState().completedAwaySale)).toBe(true);
 });
 
 test("靠港下船会修满船壳，上船后回到航行状态", async ({ page }) => {

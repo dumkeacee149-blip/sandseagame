@@ -6,7 +6,15 @@ import { surfaceHeight } from "./sand";
 import { createVoxelAsset } from "../voxel-assets";
 
 // 可劈碎的货箱：攻击系统的打击目标，劈碎掉战利品
-export const breakableCrates: THREE.Mesh[] = [];
+export type BreakableCrate = THREE.Mesh & { userData: { crateId?: string } };
+export const breakableCrates: BreakableCrate[] = [];
+
+function addBreakableCrate(group: THREE.Group, crate: THREE.Mesh, crateId: string) {
+  const breakable = crate as BreakableCrate;
+  breakable.userData.crateId = crateId;
+  breakableCrates.push(breakable);
+  group.add(breakable);
+}
 
 // 沙海礁岩：船的碰撞障碍（x/z/半径），visual 由 createSeaScatter 生成
 export const SEA_OBSTACLES: ReadonlyArray<{ x: number; z: number; r: number; model: string; fp: number; rot: number }> = [
@@ -121,8 +129,7 @@ export function createOasisPort() {
 
   for (let i = 0; i < 8; i += 1) {
     const crate = box(14, 12, 14, mat("crate", "#8a5a35"), [-82 + i * 22, 17, 92 + (i % 2) * 20]);
-    breakableCrates.push(crate);
-    group.add(crate);
+    addBreakableCrate(group, crate, `oasis-${i}`);
   }
 
   // E 系列环境素材：民居/水井/货摊/瞭望塔/栈桥，把港口做出小镇密度
@@ -209,11 +216,8 @@ export function createDuneskullCamp() {
   const group = new THREE.Group();
   group.position.set(1150, 0, -1150);
 
-  // 门面：半埋的巨兽肋骨拱在集市正后方
-  placeEnv(group, "/models/ribs.glb", 96, 6, -52, 0.35, 40);
-
-  // 颅骨拱门(D01)：跨在栈桥→集市的必经路上，双眼窝朝南迎客
-  placeEnv(group, "/models/skull_gate.glb", 72, 0, 110, 0, 50);
+  // 门面：D01 巨兽颅骨拱门替换旧肋骨拱，双眼窝朝南迎客。
+  placeEnv(group, "/models/skull_gate.glb?v=d01-v1", 72, 6, -92, 0.35, 50);
 
   const tentPlaceholder = createVoxelAsset("A03");
   tentPlaceholder.scale.setScalar(10);
@@ -231,8 +235,7 @@ export function createDuneskullCamp() {
 
   for (let i = 0; i < 4; i += 1) {
     const crate = box(13, 11, 13, mat("crate", "#8a5a35"), [-38 + i * 20, 16, 52]);
-    breakableCrates.push(crate);
-    group.add(crate);
+    addBreakableCrate(group, crate, `duneskull-${i}`);
   }
 
   groundChildren(group);
@@ -309,8 +312,7 @@ export function createSaltcrestCamp() {
 
   for (let i = 0; i < 5; i += 1) {
     const crate = box(13, 11, 13, mat("crate", "#8a5a35"), [42 + (i % 3) * 20, 16, 48 + Math.floor(i / 3) * 22]);
-    breakableCrates.push(crate);
-    group.add(crate);
+    addBreakableCrate(group, crate, `saltcrest-${i}`);
   }
 
   placeEnv(group, "/models/house_b.glb", 52, 75, -62, 2.2);

@@ -3,7 +3,7 @@ import { shipState } from "./ship-controller";
 import { playerState } from "./player";
 import { getState, setState } from "./store";
 import { applyWormBite } from "./economy";
-import { WORM_MAX_HP, WORM_RESPAWN_SECONDS } from "./data";
+import { WORM_MAX_HP, WORM_RESPAWN_SECONDS, type WormDeathRecord } from "./data";
 
 // 沙虫 AI（多实例）：每只有自己的领地与状态机。
 // 攻击判定以沙虫自身为圆心：目标（航行中的船或步行角色）进入 ATTACK_RANGE
@@ -116,6 +116,26 @@ export function damageWorm(agent: WormAgent, damage: number): boolean {
     agent.mode = "chase";
   }
   return false;
+}
+
+export function applySavedWormDeaths(records: readonly WormDeathRecord[]) {
+  const now = Date.now();
+  for (const agent of wormAgents) {
+    const record = records.find((entry) => entry.id === agent.id);
+    if (record && Number.isFinite(record.deadUntil) && record.deadUntil > now) {
+      agent.mode = "dead";
+      agent.hp = 0;
+      agent.respawnTimer = Math.max(0.1, (record.deadUntil - now) / 1000);
+      continue;
+    }
+    if (agent.mode === "dead") {
+      agent.hp = WORM_MAX_HP;
+      agent.position.set(agent.territory.x, 0, agent.territory.z);
+      agent.mode = "patrol";
+      agent.respawnTimer = 0;
+      pickPatrolTarget(agent);
+    }
+  }
 }
 
 function updateAgent(agent: WormAgent, delta: number, sailing: boolean): boolean {

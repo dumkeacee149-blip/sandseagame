@@ -15,7 +15,7 @@ const QUESTS: readonly Quest[] = [
   { id: "ashore", text: "Dock at Oasis Harbor and go ashore", reward: 15, done: (s) => s.visited.length >= 1 },
   { id: "crate", text: "Crack open a supply crate", reward: 10, done: (s) => s.cratesBroken >= 1 },
   { id: "first-buy", text: "Buy trade goods at a market", reward: 20, done: (s) => s.trades >= 1 },
-  { id: "first-sale", text: "Sell cargo at another port", reward: 25, done: (s) => s.trades >= 2 },
+  { id: "first-sale", text: "Sell cargo at another port", reward: 25, done: (s) => s.completedAwaySale },
   { id: "nest-egg", text: "Hold 150 gold at once", reward: 30, done: (s) => s.gold >= 150 },
   {
     id: "upgrade",

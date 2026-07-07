@@ -50,6 +50,7 @@ export function buyGood(state: GameState, portId: PortId, good: GoodId, qty: num
     gold: state.gold - cost,
     cargo: { ...state.cargo, [good]: state.cargo[good] + qty },
     trades: state.trades + 1,
+    lastBuyPort: portId,
   };
 }
 
@@ -57,11 +58,13 @@ export function sellGood(state: GameState, portId: PortId, good: GoodId, qty: nu
   const price = findPort(portId).sell[good];
   if (price === undefined || qty <= 0) return state;
   if (state.cargo[good] < qty) return state;
+  const soldAway = state.lastBuyPort !== null && state.lastBuyPort !== portId;
   return {
     ...state,
     gold: state.gold + price * qty,
     cargo: { ...state.cargo, [good]: state.cargo[good] - qty },
     trades: state.trades + 1,
+    completedAwaySale: state.completedAwaySale || soldAway,
   };
 }
 
@@ -105,7 +108,7 @@ export function applyHullDamage(state: GameState, damage: number): GameState {
 // 沙虫咬击：扣船壳 + 掉 25% 载货 + 幸存计数
 export function applyWormBite(state: GameState, damage: number): GameState {
   const bitten = loseCargo(applyHullDamage(state, damage), 0.25);
-  return { ...bitten, bitesSurvived: bitten.bitesSurvived + 1 };
+  return { ...bitten, bitesSurvived: bitten.hull > 0 ? bitten.bitesSurvived + 1 : bitten.bitesSurvived };
 }
 
 // 搁浅：掉 50% 货 + 拖船费，满耐久在最后交易港重生（金币只扣到 0 不为负）
@@ -129,9 +132,15 @@ export function recordVisit(state: GameState, portId: PortId): GameState {
   };
 }
 
-// 劈碎货箱：+2 金并计数（任务进度）
-export function recordCrateBreak(state: GameState): GameState {
-  return { ...state, gold: state.gold + 2, cratesBroken: state.cratesBroken + 1 };
+// 劈碎货箱：每个固定货箱只结算一次，防止刷新页面重复刷金/任务。
+export function recordCrateBreak(state: GameState, crateId: string): GameState {
+  if (state.brokenCrateIds.includes(crateId)) return state;
+  return {
+    ...state,
+    gold: state.gold + 2,
+    cratesBroken: state.cratesBroken + 1,
+    brokenCrateIds: [...state.brokenCrateIds, crateId],
+  };
 }
 
 // 金币→$SAND 兑换（预发布记账）
@@ -147,9 +156,13 @@ export function buyHarpoon(state: GameState): GameState {
   return { ...state, gold: state.gold - HARPOON_COST, harpoon: true };
 }
 
-// 击杀沙虫：赏金 + 战绩
-export function recordWormKill(state: GameState): GameState {
-  return { ...state, gold: state.gold + WORM_BOUNTY, wormKills: state.wormKills + 1 };
+// 击杀沙虫：赏金 + 战绩；死亡倒计时写入存档，刷新后不能重复领赏。
+export function recordWormKill(state: GameState, wormId: number, deadUntil: number): GameState {
+  const wormDeaths = [
+    ...state.wormDeaths.filter((record) => record.id !== wormId),
+    { id: wormId, deadUntil },
+  ];
+  return { ...state, gold: state.gold + WORM_BOUNTY, wormKills: state.wormKills + 1, wormDeaths };
 }
 
 // 更衣室换色

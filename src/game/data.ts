@@ -107,6 +107,11 @@ export type DockingStatus =
   | { readonly kind: "sailing" }
   | { readonly kind: "docked"; readonly portId: PortId };
 
+export interface WormDeathRecord {
+  readonly id: number;
+  readonly deadUntil: number;
+}
+
 export interface GameState {
   readonly gold: number;
   readonly cargo: Readonly<Record<GoodId, number>>;
@@ -120,16 +125,21 @@ export interface GameState {
   readonly completed: boolean;
   // 累计成交笔数（买+卖各算一笔）：任务链的进度依据
   readonly trades: number;
+  // 最近一次进货港；完成异港售卖后解锁贸易任务，避免原港刷两笔买卖。
+  readonly lastBuyPort: PortId | null;
+  readonly completedAwaySale: boolean;
   // 预发布代币记账（$SAND on Solana，TGE 后接链上）
   readonly tokens: number;
   // 任务系统的进度统计
   readonly visited: readonly PortId[];
   readonly cratesBroken: number;
+  readonly brokenCrateIds: readonly string[];
   readonly bitesSurvived: number;
   readonly claimedQuests: readonly string[];
   // 鱼叉炮（击杀沙虫的门槛）与猎杀战绩
   readonly harpoon: boolean;
   readonly wormKills: number;
+  readonly wormDeaths: readonly WormDeathRecord[];
   // 船长外观（更衣室）
   readonly outfit: OutfitState;
 }
@@ -191,13 +201,17 @@ export function createInitialState(): GameState {
     mapPurchased: false,
     completed: false,
     trades: 0,
+    lastBuyPort: null,
+    completedAwaySale: false,
     tokens: 0,
     visited: [],
     cratesBroken: 0,
+    brokenCrateIds: [],
     bitesSurvived: 0,
     claimedQuests: [],
     harpoon: false,
     wormKills: 0,
+    wormDeaths: [],
     outfit: OUTFIT_DEFAULT,
   };
 }

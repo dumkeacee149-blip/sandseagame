@@ -44,14 +44,14 @@ import {
 } from "./game/player";
 import { updateHud } from "./ui/hud";
 import { initQuests } from "./ui/quests";
-import { initChat, postChat, isChatOpen } from "./ui/chat";
+import { initChat, postChat } from "./ui/chat";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
 import { initMinimap, updateMinimap } from "./ui/minimap";
 import { showModal, isModalOpen } from "./ui/modal";
 import { getState, setState, subscribe, resetState } from "./game/store";
 import * as economy from "./game/economy";
 import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, dockAt, undock } from "./game/economy";
-import { updateWormAi, wormAi, wormAgents, damageWorm } from "./game/worm-ai";
+import { updateWormAi, wormAi, wormAgents, damageWorm, applySavedWormDeaths } from "./game/worm-ai";
 import type { WormAgent } from "./game/worm-ai";
 import { save, load, clearSave } from "./game/save";
 import { resolveIdentity, isWalletLinked, shortIdentity, isSpectator, connectWallet } from "./core/wallet";
@@ -68,6 +68,7 @@ import {
   HARPOON_RANGE,
   HARPOON_COOLDOWN,
   WORM_BOUNTY,
+  WORM_RESPAWN_SECONDS,
 } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -240,6 +241,14 @@ function boardShip() {
 
 // 劈碎货箱的战利品直接进金库（+2 gold/箱）
 
+function syncBrokenCrates() {
+  const broken = new Set(getState().brokenCrateIds);
+  for (const crate of breakableCrates) {
+    const crateId = crate.userData.crateId;
+    crate.visible = !crateId || !broken.has(crateId);
+  }
+}
+
 type Splinter = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number };
 const splinters: Splinter[] = [];
 const splinterGeometry = new THREE.BoxGeometry(3.4, 3.4, 3.4);
@@ -359,7 +368,7 @@ function updateBolts(delta: number) {
         const died = damageWorm(bolt.target, HARPOON_DAMAGE);
         spawnSplinters(new THREE.Vector3(targetPos.x, bolt.mesh.position.y, targetPos.z));
         if (died) {
-          setState(economy.recordWormKill(getState()));
+          setState(economy.recordWormKill(getState(), bolt.target.id, Date.now() + WORM_RESPAWN_SECONDS * 1000));
           showToast(`Leviathan slain! +${WORM_BOUNTY}g bounty`);
           postChat("Lookout", `The leviathan sinks beneath the dunes! Bounty +${WORM_BOUNTY}g. It will stir again…`);
         } else {
@@ -396,9 +405,17 @@ function tryBreakCrates() {
     if (!crate.visible) continue;
     crate.getWorldPosition(crateWorldPos);
     if (crateWorldPos.distanceTo(hitProbe) < 24) {
+      const crateId = crate.userData.crateId;
+      if (!crateId) continue;
+      const state = getState();
+      const next = recordCrateBreak(state, crateId);
+      if (next === state) {
+        crate.visible = false;
+        continue;
+      }
       crate.visible = false;
       spawnSplinters(crateWorldPos);
-      setState(recordCrateBreak(getState()));
+      setState(next);
     }
   }
 }
@@ -478,6 +495,8 @@ function startGame() {
       shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
       shipState.heading = savedGame.ship.heading;
     }
+    syncBrokenCrates();
+    applySavedWormDeaths(getState().wormDeaths);
     applyOutfit(getState().outfit);
     subscribe((state) => save(state, shipSnapshot()));
 
@@ -517,6 +536,7 @@ if (import.meta.env.DEV) {
     getPlayerY: () => playerState.position.y,
     getPlayerPos: () => ({ x: playerState.position.x, y: playerState.position.y, z: playerState.position.z }),
     getShipPos: () => ({ x: shipState.position.x, z: shipState.position.z }),
+    getHarpoonCooldown: () => harpoonCooldown,
     getStick,
     getState,
     setState,
