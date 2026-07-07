@@ -13,6 +13,9 @@ export function loadModel(url: string) {
   if (!cached) {
     cached = new Promise<THREE.Group>((resolve, reject) => {
       gltfLoader.load(url, (gltf) => resolve(gltf.scene), undefined, reject);
+    }).catch((error) => {
+      modelCache.delete(url);
+      throw error;
     });
     modelCache.set(url, cached);
   }
@@ -27,6 +30,9 @@ export function loadRiggedModel(url: string) {
   if (!cached) {
     cached = new Promise<GLTF>((resolve, reject) => {
       gltfLoader.load(url, resolve, undefined, reject);
+    }).catch((error) => {
+      riggedCache.delete(url);
+      throw error;
     });
     riggedCache.set(url, cached);
   }

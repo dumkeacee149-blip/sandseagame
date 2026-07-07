@@ -97,6 +97,7 @@ let activeAsset: THREE.Group | null = null;
 let narrowSheet = window.innerWidth < 760;
 let compareReady = false;
 const gltfLoader = new GLTFLoader();
+let stageGeneration = 0;
 
 type AnimationPlayer = {
   mixer: THREE.AnimationMixer;
@@ -117,6 +118,32 @@ const stageMaterials = {
   basalt: new THREE.MeshLambertMaterial({ color: "#24232b", flatShading: true }),
   brass: new THREE.MeshLambertMaterial({ color: "#c89335", flatShading: true }),
 };
+const sharedStageMaterials = new Set<THREE.Material>(Object.values(stageMaterials));
+
+function disposeMaterial(material: THREE.Material) {
+  if (sharedStageMaterials.has(material)) return;
+  for (const value of Object.values(material as unknown as Record<string, unknown>)) {
+    if (value instanceof THREE.Texture) value.dispose();
+  }
+  material.dispose();
+}
+
+function disposeObjectTree(object: THREE.Object3D) {
+  const disposeAllMaterials = object.userData.source === "hunyuan" || object.name.startsWith("hunyuan-");
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material) => {
+        const hasTexture = Object.values(material as unknown as Record<string, unknown>).some(
+          (value) => value instanceof THREE.Texture,
+        );
+        if (disposeAllMaterials || hasTexture) disposeMaterial(material);
+      });
+    }
+  });
+}
 
 function makeStageBox(
   size: [number, number, number],
@@ -137,7 +164,10 @@ function clearStage() {
   rebuildClipTabs(null);
   while (stage.children.length > 0) {
     const child = stage.children.pop();
-    if (child) stage.remove(child);
+    if (child) {
+      stage.remove(child);
+      disposeObjectTree(child);
+    }
   }
   activeAsset = null;
 }
@@ -256,9 +286,13 @@ async function loadHunyuanAsset(path: string, id: string) {
     };
     startClip(player, 0);
     asset.userData.animationPlayer = player;
-    animationPlayers.push(player);
   }
   return asset;
+}
+
+function registerAnimationPlayer(asset: THREE.Object3D) {
+  const player = asset.userData.animationPlayer as AnimationPlayer | undefined;
+  if (player && !animationPlayers.includes(player)) animationPlayers.push(player);
 }
 
 async function createPreferredAsset(index: number) {
@@ -441,6 +475,7 @@ function setCompareCamera() {
 }
 
 async function showAsset(index: number) {
+  const generation = ++stageGeneration;
   selectedIndex = index;
   const definition = ASSET_DEFINITIONS[index];
   clearStage();
@@ -454,10 +489,15 @@ async function showAsset(index: number) {
   rebuildTabs();
 
   const asset = await createPreferredAsset(index);
+  if (generation !== stageGeneration) {
+    disposeObjectTree(asset);
+    return;
+  }
   const reviewExtent = definition.id === "H02" ? 6.2 : window.innerWidth < 760 ? 4.25 : 5.2;
   fitAsset(asset, reviewExtent);
   applyReviewPose(asset, definition.id);
   asset.position.y += 0.1;
+  registerAnimationPlayer(asset);
   activeAsset = asset;
   stage.add(asset);
   rebuildClipTabs((asset.userData.animationPlayer as AnimationPlayer | undefined) ?? null);
@@ -466,6 +506,7 @@ async function showAsset(index: number) {
 }
 
 async function showSheet() {
+  const generation = ++stageGeneration;
   clearStage();
   stage.add(createSandFloor());
 
@@ -476,29 +517,36 @@ async function showSheet() {
   const offsetX = ((columns - 1) * spacingX) / 2;
   const offsetZ = ((rows - 1) * spacingZ) / 2;
 
-  await Promise.all(
-    ASSET_DEFINITIONS.map(async (definition, index) => {
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      const cell = new THREE.Group();
-      cell.position.set(col * spacingX - offsetX, 0, row * spacingZ - offsetZ);
-      cell.add(createPedestal(4.35, 3.75));
+  await Promise.all(ASSET_DEFINITIONS.map(async (definition, index) => {
+    if (generation !== stageGeneration) return;
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    const cell = new THREE.Group();
+    cell.position.set(col * spacingX - offsetX, 0, row * spacingZ - offsetZ);
+    cell.add(createPedestal(4.35, 3.75));
 
-      const hasHunyuanPath = Boolean(getPreferredHunyuanPath(index));
-      const asset = await createPreferredAsset(index);
-      fitAsset(asset, 2.9);
-      applyReviewPose(asset, definition.id);
-      asset.position.y += 0.12;
-      cell.add(asset);
+    const hasHunyuanPath = Boolean(getPreferredHunyuanPath(index));
+    const asset = await createPreferredAsset(index);
+    if (generation !== stageGeneration) {
+      disposeObjectTree(asset);
+      disposeObjectTree(cell);
+      return;
+    }
+    fitAsset(asset, 2.9);
+    applyReviewPose(asset, definition.id);
+    asset.position.y += 0.12;
+    registerAnimationPlayer(asset);
+    cell.add(asset);
 
-      const label = createLabelSprite(
-        hasHunyuanPath ? `${definition.id} 混元候选` : `${definition.id} ${definition.zhName}`,
-      );
-      label.position.set(0, 2.85, 1.78);
-      cell.add(label);
-      stage.add(cell);
-    }),
-  );
+    const label = createLabelSprite(
+      hasHunyuanPath ? `${definition.id} 混元候选` : `${definition.id} ${definition.zhName}`,
+    );
+    label.position.set(0, 2.85, 1.78);
+    cell.add(label);
+    stage.add(cell);
+  }));
+
+  if (generation !== stageGeneration) return;
 
   setSheetCamera(columns, rows);
   updateHeader(0);
@@ -506,6 +554,7 @@ async function showSheet() {
 }
 
 async function showHunyuanComparison() {
+  const generation = ++stageGeneration;
   compareReady = false;
   clearStage();
   stage.add(createSandFloor());
@@ -536,8 +585,13 @@ async function showHunyuanComparison() {
   rebuildTabs();
 
   const hunyuanAsset = await loadHunyuanAsset(hunyuanAssetPaths.A01, "A01");
+  if (generation !== stageGeneration) {
+    disposeObjectTree(hunyuanAsset);
+    return;
+  }
   fitAsset(hunyuanAsset, 4.4);
   hunyuanAsset.position.set(3.9, hunyuanAsset.position.y + 0.12, 0);
+  registerAnimationPlayer(hunyuanAsset);
   stage.add(hunyuanAsset);
   compareReady = true;
   updateHeader(0);
