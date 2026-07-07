@@ -1,4 +1,5 @@
 import { setKeyCapture, isKeyCaptured } from "../core/input";
+import { t } from "../core/i18n";
 
 // 港湾频道：UI 与消息流已就绪，当前为本地模式（NPC 闲聊 + 系统播报 + 玩家发言）。
 // W3 部署时接 Cloudflare Worker WebSocket 即升级为真全服频道——只需替换 transport。
@@ -7,15 +8,15 @@ type ChatKind = "player" | "npc" | "system";
 
 const MAX_MESSAGES = 9;
 
-// NPC 闲聊（原创台词，给单机世界一点人气）
+// NPC 闲聊（i18n 键值对，发送时按当前语言取文案）
 const NPC_CHATTER: Array<[string, string]> = [
-  ["Mirza the Trader", "Spice is fetching mad prices out at Duneskull, if you dare the worm."],
-  ["Old Salt Beshir", "Saw the leviathan breach at dusk. Bigger than last season, I swear."],
-  ["Mirza the Trader", "Dates buy low here, sell sweet at Saltcrest. Easy run for a new sail."],
-  ["Dockhand Nur", "Keep your hull patched, Captain. The sandsea forgives nothing."],
-  ["Old Salt Beshir", "They say a relic vault sleeps under the Sunken Ruins. Maps cost a fortune."],
-  ["Dockhand Nur", "Wind's turning. Good day to run the near route twice."],
-  ["Mirza the Trader", "A cargo hold upgrade pays itself back in three runs. Just saying."],
+  ["npc.mirza", "chatter.1"],
+  ["npc.beshir", "chatter.2"],
+  ["npc.mirza", "chatter.3"],
+  ["npc.nur", "chatter.4"],
+  ["npc.beshir", "chatter.5"],
+  ["npc.nur", "chatter.6"],
+  ["npc.mirza", "chatter.7"],
 ];
 
 let logEl: HTMLUListElement | null = null;
@@ -73,9 +74,13 @@ function connectGlobalChat() {
     socket = new WebSocket(url);
     socket.addEventListener("open", () => {
       socketReady = true;
-      const badge = document.querySelector(".chat-local");
-      if (badge) badge.textContent = "GLOBAL";
-      appendMessage("Harbormaster", "Connected to the global Harbor Band.", "npc");
+      const badge = document.querySelector<HTMLElement>(".chat-local");
+      if (badge) {
+        // 改写 data-i18n 键，语言切换时 applyStaticI18n 能保持"全服"标记
+        badge.dataset.i18n = "chat.global";
+        badge.textContent = t("chat.global");
+      }
+      appendMessage(t("npc.harbormaster"), t("chat.globalConnected"), "npc");
     });
     socket.addEventListener("message", (event) => {
       try {
@@ -106,7 +111,7 @@ function sendCurrent() {
       socket.send(JSON.stringify({ author: "Captain", text }));
     } else {
       // 本地模式：直接回显
-      appendMessage("Captain (you)", text, "player");
+      appendMessage(t("chat.you"), text, "player");
     }
   }
   closeChatInput();
@@ -123,8 +128,6 @@ export function initChat() {
 
   window.addEventListener("keydown", (event) => {
     if (event.code !== "Enter") return;
-    // 观众模式聊天面板整体隐藏，不能让看不见的输入框抢焦点
-    if (document.body.classList.contains("spectator")) return;
     if (!isChatOpen() && !isKeyCaptured()) {
       event.preventDefault();
       openChatInput();
@@ -145,7 +148,7 @@ export function initChat() {
     if (isChatOpen()) closeChatInput();
   });
 
-  appendMessage("Harbormaster", "Welcome to the Sandsea, Captain. Markets are marked overhead.", "npc");
+  appendMessage(t("npc.harbormaster"), t("chat.welcome"), "npc");
   connectGlobalChat();
 
   // 环境闲聊：40-75 秒一条，顺序轮播不重复
@@ -153,9 +156,9 @@ export function initChat() {
   const scheduleChatter = () => {
     const delay = 40000 + Math.random() * 35000;
     setTimeout(() => {
-      const [author, line] = NPC_CHATTER[chatterIndex % NPC_CHATTER.length];
+      const [authorKey, lineKey] = NPC_CHATTER[chatterIndex % NPC_CHATTER.length];
       chatterIndex += 1;
-      appendMessage(author, line, "npc");
+      appendMessage(t(authorKey), t(lineKey), "npc");
       scheduleChatter();
     }, delay);
   };

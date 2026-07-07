@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { GameState } from "../game/data";
 import { cargoCapacity, cargoCount, maxHull, PORTS, TREASURE_X, TREASURE_Z } from "../game/data";
+import { t } from "../core/i18n";
 
 // 方位角转罗盘文字（世界 +z 为北）
 function bearingLabel(dx: number, dz: number) {
@@ -17,8 +18,19 @@ const cargoEl = document.querySelector("#cargo");
 const hullEl = document.querySelector("#hull");
 const hullChipEl = hullEl?.closest(".stat-hull") ?? null;
 const routeEl = document.querySelector("#route");
+const phpEl = document.querySelector("#php");
+const phpChipEl = document.querySelector<HTMLElement>("#php-chip");
 
 const portProbe = new THREE.Vector3();
+
+// 步行 HP：上岸才显示（船上看船壳），低于 40% 红色脉冲复用 hull-low 样式
+export function updatePlayerHpChip(hp: number, maxHp: number, walking: boolean) {
+  if (!phpChipEl) return;
+  phpChipEl.hidden = !walking;
+  if (!walking) return;
+  if (phpEl) phpEl.textContent = hp.toString();
+  phpChipEl.classList.toggle("hull-low", hp < maxHp * 0.4);
+}
 
 export function updateHud(state: GameState, shipSpeed: number, shipPosition: THREE.Vector3) {
   if (speedEl) speedEl.textContent = Math.round(Math.abs(shipSpeed) * 0.44).toString();
@@ -33,17 +45,18 @@ export function updateHud(state: GameState, shipSpeed: number, shipPosition: THR
     if (state.mapPurchased && !state.completed) {
       const dx = TREASURE_X - shipPosition.x;
       const dz = TREASURE_Z - shipPosition.z;
-      routeEl.textContent = `Relic Vault · ${bearingLabel(dx, dz)} · ${Math.round(Math.hypot(dx, dz))}m`;
+      routeEl.textContent = `${t("route.vault")} · ${bearingLabel(dx, dz)} · ${Math.round(Math.hypot(dx, dz))}m`;
       return;
     }
-    let nearest = "Open Sandsea";
+    let nearest = t("route.open");
     let nearestDistance = Infinity;
     for (const port of PORTS) {
       portProbe.set(port.x, shipPosition.y, port.z);
       const distance = shipPosition.distanceTo(portProbe);
       if (distance < nearestDistance) {
         nearestDistance = distance;
-        nearest = distance < 340 ? port.name : `${port.name} · ${Math.round(distance)}m`;
+        const name = t(`port.${port.id}`);
+        nearest = distance < 340 ? name : `${name} · ${Math.round(distance)}m`;
       }
     }
     routeEl.textContent = nearest;

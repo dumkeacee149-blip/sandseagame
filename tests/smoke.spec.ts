@@ -234,27 +234,22 @@ test("巨兽咬击会进入 bite 状态再下潜", async ({ page }) => {
   await expect.poll(async () => page.evaluate(() => window.__game!.wormAi.mode), { timeout: 6_000 }).toBe("dive");
 });
 
-test("观众模式：不链钱包只能观看——HUD 隐藏、无法开船、横幅引导链接", async ({ page }) => {
-  // ?wallet=1 强制真实登录门（无 provider 环境显示 Install Phantom + 观众入口）
-  await page.goto("/?wallet=1");
-  await expect(page.locator("#wallet-gate")).toBeVisible();
-  await page.locator("#wallet-guest").click();
+test("试玩期无登录门：访客直接开玩——无门、HUD 可见、能开船", async ({ page }) => {
+  // 新设计（wallet.ts）：默认访客直接进游戏；钱包只是可选身份，不再有观众模式
+  await boot(page);
+  await expect(page.locator("#wallet-gate")).toHaveCount(0);
+  await expect(page.locator(".spectator-banner")).toHaveCount(0);
+  await expect(page.locator(".hud")).toBeVisible();
 
-  await page.waitForFunction(() => document.body.classList.contains("spectator"));
-  await expect(page.locator(".spectator-banner")).toBeVisible();
-  await expect(page.locator("#spectator-connect")).toBeVisible();
-  await expect(page.locator(".hud")).toBeHidden();
-  await expect(page.locator("#minimap")).toBeHidden();
-
-  // 输入不生效：按 W 船速始终为 0
+  // 访客输入生效：按 W 船开始移动
   await page.keyboard.down("KeyW");
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1500);
   await page.keyboard.up("KeyW");
   const shipMoved = await page.evaluate(() => {
     const pos = window.__game!.getShipPos();
     return Math.hypot(pos.x, pos.z) > 1;
   });
-  expect(shipMoved).toBe(false);
+  expect(shipMoved).toBe(true);
 });
 
 test("触屏布局不遮挡底部操作区，并提供攻击按钮", async ({ page }) => {

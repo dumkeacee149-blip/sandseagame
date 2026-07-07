@@ -1,17 +1,25 @@
 import type { GameState } from "./data";
 import {
+  EQUIP_SLOTS,
   GOODS,
+  ITEMS,
   OUTFIT_COLORS,
   PORTS,
   OUTFIT_DEFAULT,
+  SKILLS,
   UPGRADES,
   createInitialState,
+  findItem,
+  findSkill,
   maxHull,
+  type EnemyDeathRecord,
+  type ItemId,
   type OutfitState,
   type PortId,
+  type SkillId,
   type UpgradeId,
-  type WormDeathRecord,
 } from "./data";
+import { skillPointsEarned } from "./economy";
 import { getIdentity } from "../core/wallet";
 
 // 存档按钱包身份隔离：每个钱包一份进度，访客用本机 guest 档
@@ -75,17 +83,54 @@ function sanitizeVisited(value: unknown) {
   return [...new Set(value.filter(isPortId))];
 }
 
-function sanitizeWormDeaths(value: unknown): readonly WormDeathRecord[] {
+function sanitizeEnemyDeaths(value: unknown): readonly EnemyDeathRecord[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((record) => {
-      const candidate = record as Partial<WormDeathRecord>;
+      const candidate = record as Partial<EnemyDeathRecord>;
       return {
+        kind: candidate.kind === "crab" ? ("crab" as const) : ("worm" as const),
         id: clampInt(candidate.id, -1, 0, 99),
         deadUntil: clampNumber(candidate.deadUntil, 0),
       };
     })
     .filter((record) => record.deadUntil > Date.now());
+}
+
+const ITEM_IDS = ITEMS.map((item) => item.id);
+const SKILL_IDS = SKILLS.map((skill) => skill.id);
+
+function isItemId(value: unknown): value is ItemId {
+  return typeof value === "string" && ITEM_IDS.includes(value as ItemId);
+}
+
+function sanitizeOwnedItems(value: unknown): readonly ItemId[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(isItemId))];
+}
+
+// 技能清洗：只留合法 ID，且逐层校验（同分支前置层缺失的直接丢弃）
+function sanitizeSkills(value: unknown): SkillId[] {
+  if (!Array.isArray(value)) return [];
+  const candidates = [...new Set(value.filter((id): id is SkillId => typeof id === "string" && SKILL_IDS.includes(id as SkillId)))];
+  const kept: SkillId[] = [];
+  // 按层序反复收敛，直到没有新技能可保留（乱序存档也能正确重建链）
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const id of candidates) {
+      if (kept.includes(id)) continue;
+      const skill = findSkill(id);
+      const prevOk =
+        skill.tier === 1 ||
+        kept.some((k) => findSkill(k).branch === skill.branch && findSkill(k).tier === skill.tier - 1);
+      if (prevOk) {
+        kept.push(id);
+        changed = true;
+      }
+    }
+  }
+  return kept;
 }
 
 function sanitizeBrokenCrateIds(value: unknown, cratesBroken: number) {
@@ -117,6 +162,20 @@ function sanitizeState(rawState: Partial<GameState>, options: { legacyCompletedA
 
   const trades = clampInt(rawState.trades, defaults.trades);
   const cratesBroken = clampInt(rawState.cratesBroken, defaults.cratesBroken);
+
+  // 装备：先清洗背包，再校验槽位（未拥有/槽位不符的引用清空）
+  const ownedItems = sanitizeOwnedItems(rawState.ownedItems);
+  const equipment = { ...defaults.equipment };
+  for (const slot of EQUIP_SLOTS) {
+    const itemId = rawState.equipment?.[slot];
+    equipment[slot] =
+      isItemId(itemId) && ownedItems.includes(itemId) && findItem(itemId).slot === slot ? itemId : null;
+  }
+
+  // 老档迁移：wormDeaths（无 kind 字段）提升为 enemyDeaths
+  const legacyState = rawState as Partial<GameState> & { wormDeaths?: unknown };
+  const rawDeaths = rawState.enemyDeaths ?? legacyState.wormDeaths;
+
   const merged: GameState = {
     ...defaults,
     gold: clampInt(rawState.gold, defaults.gold),
@@ -130,6 +189,7 @@ function sanitizeState(rawState: Partial<GameState>, options: { legacyCompletedA
     trades,
     lastBuyPort: isPortId(rawState.lastBuyPort) ? rawState.lastBuyPort : null,
     completedAwaySale: rawState.completedAwaySale === true || Boolean(options.legacyCompletedAwaySale && trades >= 2),
+    tradeGold: clampInt(rawState.tradeGold, defaults.tradeGold),
     tokens: clampInt(rawState.tokens, defaults.tokens),
     visited: sanitizeVisited(rawState.visited),
     cratesBroken,
@@ -138,11 +198,21 @@ function sanitizeState(rawState: Partial<GameState>, options: { legacyCompletedA
     claimedQuests: sanitizeStringList(rawState.claimedQuests),
     harpoon: rawState.harpoon === true,
     wormKills: clampInt(rawState.wormKills, defaults.wormKills),
-    wormDeaths: sanitizeWormDeaths(rawState.wormDeaths),
+    crabKills: clampInt(rawState.crabKills, defaults.crabKills),
+    enemyDeaths: sanitizeEnemyDeaths(rawDeaths),
+    equipment,
+    ownedItems,
+    skills: sanitizeSkills(rawState.skills),
     outfit,
   };
 
-  return { ...merged, hull: Math.min(merged.hull, maxHull(merged)) };
+  // 技能数不能超过实际挣到的点数（防手改存档白嫖）；超出部分按解锁顺序截断
+  const trimmed =
+    merged.skills.length > skillPointsEarned(merged)
+      ? { ...merged, skills: merged.skills.slice(0, skillPointsEarned(merged)) }
+      : merged;
+
+  return { ...trimmed, hull: Math.min(trimmed.hull, maxHull(trimmed)) };
 }
 
 function sanitizeShip(rawShip: Partial<SaveFileV1["ship"]>) {

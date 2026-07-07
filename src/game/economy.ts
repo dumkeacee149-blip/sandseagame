@@ -1,10 +1,11 @@
-import type { GameState, GoodId, PortId, UpgradeId } from "./data";
+import type { EnemyKind, EquipSlotId, GameState, GoodId, ItemId, PortId, SkillId, UpgradeId } from "./data";
 import type { OutfitState } from "./data";
 import {
   PORTS,
   UPGRADES,
   HARPOON_COST,
   WORM_BOUNTY,
+  CRAB_BOUNTY,
   STRAND_TOW_FEE,
   TREASURE_MAP_COST,
   TREASURE_REWARD,
@@ -12,6 +13,9 @@ import {
   cargoCapacity,
   cargoCount,
   maxHull,
+  getDerivedStats,
+  findItem,
+  findSkill,
 } from "./data";
 
 // 随机丢弃 ratio 比例的载货（向上取整），咬击/搁浅共用
@@ -39,8 +43,21 @@ export function findPort(portId: PortId) {
   return port;
 }
 
-export function buyGood(state: GameState, portId: PortId, good: GoodId, qty: number): GameState {
+// 商贾技能调价：按单价取整（至少 1g），买卖双向共用
+export function unitBuyPrice(state: GameState, portId: PortId, good: GoodId): number | undefined {
   const price = findPort(portId).buy[good];
+  if (price === undefined) return undefined;
+  return Math.max(1, Math.round(price * getDerivedStats(state).buyPriceMul));
+}
+
+export function unitSellPrice(state: GameState, portId: PortId, good: GoodId): number | undefined {
+  const price = findPort(portId).sell[good];
+  if (price === undefined) return undefined;
+  return Math.max(1, Math.round(price * getDerivedStats(state).sellPriceMul));
+}
+
+export function buyGood(state: GameState, portId: PortId, good: GoodId, qty: number): GameState {
+  const price = unitBuyPrice(state, portId, good);
   if (price === undefined || qty <= 0) return state;
   const cost = price * qty;
   if (state.gold < cost) return state;
@@ -55,16 +72,18 @@ export function buyGood(state: GameState, portId: PortId, good: GoodId, qty: num
 }
 
 export function sellGood(state: GameState, portId: PortId, good: GoodId, qty: number): GameState {
-  const price = findPort(portId).sell[good];
+  const price = unitSellPrice(state, portId, good);
   if (price === undefined || qty <= 0) return state;
   if (state.cargo[good] < qty) return state;
   const soldAway = state.lastBuyPort !== null && state.lastBuyPort !== portId;
+  const earned = price * qty;
   return {
     ...state,
-    gold: state.gold + price * qty,
+    gold: state.gold + earned,
     cargo: { ...state.cargo, [good]: state.cargo[good] - qty },
     trades: state.trades + 1,
     completedAwaySale: state.completedAwaySale || soldAway,
+    tradeGold: state.tradeGold + earned,
   };
 }
 
@@ -105,18 +124,19 @@ export function applyHullDamage(state: GameState, damage: number): GameState {
   return { ...state, hull: Math.max(0, state.hull - damage) };
 }
 
-// 沙虫咬击：扣船壳 + 掉 25% 载货 + 幸存计数
+// 沙虫咬击：扣船壳 + 掉货（基准 25%，护货装备/技能可减）+ 幸存计数
 export function applyWormBite(state: GameState, damage: number): GameState {
-  const bitten = loseCargo(applyHullDamage(state, damage), 0.25);
+  const bitten = loseCargo(applyHullDamage(state, damage), getDerivedStats(state).biteCargoLossRatio);
   return { ...bitten, bitesSurvived: bitten.hull > 0 ? bitten.bitesSurvived + 1 : bitten.bitesSurvived };
 }
 
-// 搁浅：掉 50% 货 + 拖船费，满耐久在最后交易港重生（金币只扣到 0 不为负）
+// 搁浅：掉货（基准 50%）+ 拖船费（护符/技能可免），满耐久在最后交易港重生
 export function applyStranding(state: GameState): GameState {
-  const penalized = loseCargo(state, 0.5);
+  const stats = getDerivedStats(state);
+  const penalized = loseCargo(state, stats.strandCargoLossRatio);
   return {
     ...penalized,
-    gold: Math.max(0, penalized.gold - STRAND_TOW_FEE),
+    gold: Math.max(0, penalized.gold - (stats.towFeeWaived ? 0 : STRAND_TOW_FEE)),
     hull: maxHull(penalized),
     docking: { kind: "sailing" },
   };
@@ -156,13 +176,125 @@ export function buyHarpoon(state: GameState): GameState {
   return { ...state, gold: state.gold - HARPOON_COST, harpoon: true };
 }
 
-// 击杀沙虫：赏金 + 战绩；死亡倒计时写入存档，刷新后不能重复领赏。
-export function recordWormKill(state: GameState, wormId: number, deadUntil: number): GameState {
-  const wormDeaths = [
-    ...state.wormDeaths.filter((record) => record.id !== wormId),
-    { id: wormId, deadUntil },
+// 战利品入舱：受货舱上限约束，装不下的部分丢弃（返回实际入舱数供 UI 提示）
+export function addLoot(state: GameState, good: GoodId, qty: number): { state: GameState; added: number } {
+  const space = Math.max(0, cargoCapacity(state) - cargoCount(state));
+  const added = Math.min(qty, space);
+  if (added <= 0) return { state, added: 0 };
+  return {
+    state: { ...state, cargo: { ...state.cargo, [good]: state.cargo[good] + added } },
+    added,
+  };
+}
+
+function recordEnemyDeath(state: GameState, kind: EnemyKind, enemyId: number, deadUntil: number): GameState {
+  const enemyDeaths = [
+    ...state.enemyDeaths.filter((record) => !(record.kind === kind && record.id === enemyId)),
+    { kind, id: enemyId, deadUntil },
   ];
-  return { ...state, gold: state.gold + WORM_BOUNTY, wormKills: state.wormKills + 1, wormDeaths };
+  return { ...state, enemyDeaths };
+}
+
+// 击杀沙虫：极少赏金（经济铁律）+ 虫鳞掉落入舱 + 死亡倒计时入档防刷新重刷。
+// 掉落数量由调用方掷（纯函数不掷随机数）。
+export function recordWormKill(
+  state: GameState,
+  wormId: number,
+  deadUntil: number,
+  scaleQty: number,
+): { state: GameState; looted: number } {
+  const dead = recordEnemyDeath(state, "worm", wormId, deadUntil);
+  const { state: looted, added } = addLoot(dead, "wormscale", Math.max(0, scaleQty));
+  return {
+    state: { ...looted, gold: looted.gold + WORM_BOUNTY, wormKills: looted.wormKills + 1 },
+    looted: added,
+  };
+}
+
+// 击杀沙蟹：同一套规则（极少金币 + 甲壳掉落）
+export function recordCrabKill(
+  state: GameState,
+  crabId: number,
+  deadUntil: number,
+  chitinQty: number,
+): { state: GameState; looted: number } {
+  const dead = recordEnemyDeath(state, "crab", crabId, deadUntil);
+  const { state: looted, added } = addLoot(dead, "chitin", Math.max(0, chitinQty));
+  return {
+    state: { ...looted, gold: looted.gold + CRAB_BOUNTY, crabKills: looted.crabKills + 1 },
+    looted: added,
+  };
+}
+
+// ===== 装备栏：铁匠购买 / 材料打造 / 穿脱 / 半价回售 =====
+
+export function buyItem(state: GameState, itemId: ItemId): GameState {
+  const item = findItem(itemId);
+  if (item.cost <= 0 || state.ownedItems.includes(itemId) || state.gold < item.cost) return state;
+  return { ...state, gold: state.gold - item.cost, ownedItems: [...state.ownedItems, itemId] };
+}
+
+export function craftItem(state: GameState, itemId: ItemId): GameState {
+  const item = findItem(itemId);
+  if (!item.craft || state.ownedItems.includes(itemId)) return state;
+  const cargo = { ...state.cargo };
+  for (const [good, need] of Object.entries(item.craft) as [GoodId, number][]) {
+    if (cargo[good] < need) return state;
+    cargo[good] -= need;
+  }
+  return { ...state, cargo, ownedItems: [...state.ownedItems, itemId] };
+}
+
+export function equipItem(state: GameState, itemId: ItemId): GameState {
+  if (!state.ownedItems.includes(itemId)) return state;
+  const item = findItem(itemId);
+  if (state.equipment[item.slot] === itemId) return state;
+  return { ...state, equipment: { ...state.equipment, [item.slot]: itemId } };
+}
+
+export function unequipSlot(state: GameState, slot: EquipSlotId): GameState {
+  if (state.equipment[slot] === null) return state;
+  return { ...state, equipment: { ...state.equipment, [slot]: null } };
+}
+
+// 只有商店货（cost>0）可半价回售；已装备的先自动卸下。金币出口，不产生新金币。
+export function sellItemBack(state: GameState, itemId: ItemId): GameState {
+  const item = findItem(itemId);
+  if (item.cost <= 0 || !state.ownedItems.includes(itemId)) return state;
+  const unequipped = state.equipment[item.slot] === itemId ? unequipSlot(state, item.slot) : state;
+  return {
+    ...unequipped,
+    gold: unequipped.gold + Math.floor(item.cost / 2),
+    ownedItems: unequipped.ownedItems.filter((owned) => owned !== itemId),
+  };
+}
+
+// ===== 技能树：点数只来自任务与里程碑（不来自击杀计数——防刷）=====
+
+export function skillPointsEarned(state: GameState): number {
+  let points = Math.floor(state.claimedQuests.length / 2);
+  if (state.visited.length >= 3) points += 1;
+  if (state.completed) points += 2;
+  if (state.tradeGold >= 500) points += 1;
+  return points;
+}
+
+export function skillPointsAvailable(state: GameState): number {
+  return Math.max(0, skillPointsEarned(state) - state.skills.length);
+}
+
+export function unlockSkill(state: GameState, skillId: SkillId): GameState {
+  if (state.skills.includes(skillId)) return state;
+  if (skillPointsAvailable(state) <= 0) return state;
+  const skill = findSkill(skillId);
+  // 同分支前置层未解锁不可点（tier 1 无前置）
+  if (skill.tier > 1) {
+    const hasPrev = state.skills.some(
+      (id) => findSkill(id).branch === skill.branch && findSkill(id).tier === skill.tier - 1,
+    );
+    if (!hasPrev) return state;
+  }
+  return { ...state, skills: [...state.skills, skillId] };
 }
 
 // 更衣室换色

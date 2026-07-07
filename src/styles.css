@@ -585,6 +585,35 @@ h1 {
   text-transform: uppercase;
 }
 
+/* ---------- 技能树（交易面板内）---------- */
+.skill-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.skill-cell {
+  font-size: 0.72rem;
+  padding: 4px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+span.skill-cell {
+  color: rgba(246, 236, 210, 0.55);
+  border: 1px dashed rgba(246, 236, 210, 0.22);
+}
+
+.skill-owned {
+  color: #9fd8a2 !important;
+  border-style: solid !important;
+}
+
+.skill-locked {
+  opacity: 0.45;
+}
+
 /* ---------- 结算弹窗 ---------- */
 .game-modal {
   position: fixed;
@@ -856,97 +885,44 @@ h1 {
   }
 }
 
-/* ---------- 钱包登录门 ---------- */
-.wallet-gate {
+/* ---------- 试玩删档横幅 + 语言切换按钮 ---------- */
+.trial-note {
   position: fixed;
-  inset: 0;
-  /* 必须盖过 #boot-overlay(99)：在 Loading 暖色底之上弹登录门 */
-  z-index: 120;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(20, 12, 5, 0.78);
-  backdrop-filter: blur(6px);
-}
-
-.wallet-card {
-  width: min(400px, calc(100vw - 40px));
-  padding: 26px 28px;
-  text-align: center;
-  color: var(--cream);
-  background:
-    repeating-linear-gradient(94deg, rgba(255, 226, 166, 0.05) 0 2px, transparent 2px 7px),
-    linear-gradient(172deg, rgba(74, 51, 28, 0.98), rgba(43, 29, 16, 0.98));
-  border: 2px solid var(--brass-dim);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 0 0 1px rgba(24, 14, 5, 0.9),
-    0 18px 44px rgba(15, 8, 2, 0.6);
-}
-
-.wallet-title {
-  margin: 4px 0 0;
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 1.7rem;
-  letter-spacing: 0.04em;
-}
-
-.wallet-line {
-  margin: 12px 0 0;
-  font-size: 0.86rem;
-  line-height: 1.55;
-  color: rgba(246, 236, 210, 0.75);
-}
-
-.wallet-guest-line {
-  font-size: 0.75rem;
-  color: rgba(246, 236, 210, 0.5);
-}
-
-.wallet-guest-line a {
-  color: var(--brass-bright);
-}
-
-/* ---------- 观众模式：未链接钱包只能观看 ---------- */
-/* 隐藏一切玩家仪表与操作入口，只留纯净世界 + 底部引导横幅 */
-body.spectator .hud,
-body.spectator .minimap,
-body.spectator .action-chip,
-body.spectator .controls-hint,
-body.spectator .chat-panel,
-body.spectator .quest-panel,
-body.spectator .touch-stick,
-body.spectator .touch-button {
-  display: none;
-}
-
-.spectator-banner {
-  position: fixed;
-  bottom: 22px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
-  max-width: calc(100vw - 32px);
-  background:
-    repeating-linear-gradient(94deg, rgba(255, 226, 166, 0.05) 0 2px, transparent 2px 7px),
-    linear-gradient(172deg, rgba(74, 51, 28, 0.96), rgba(43, 29, 16, 0.96));
-  border: 2px solid var(--brass-dim);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 0 0 1px rgba(24, 14, 5, 0.9),
-    0 10px 28px rgba(15, 8, 2, 0.5);
-  font-size: 0.88rem;
-  color: rgba(246, 236, 210, 0.85);
+  padding: 4px 14px;
+  max-width: calc(100vw - 130px);
+  background: rgba(43, 29, 16, 0.82);
+  border: 1px solid var(--brass-dim);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: rgba(246, 236, 210, 0.8);
+  pointer-events: none;
+  text-align: center;
 }
 
-.spectator-banner .modal-button {
-  margin: 0;
-  white-space: nowrap;
+.lang-toggle {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 41;
+  padding: 4px 12px;
+  background: rgba(43, 29, 16, 0.82);
+  border: 1px solid var(--brass-dim);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.lang-toggle:hover {
+  border-color: var(--brass-bright);
+  color: var(--brass-bright);
 }
 
 /* ---------- 任务奖励徽标 ---------- */

@@ -1,36 +1,36 @@
 import type { GameState } from "../game/data";
 import { subscribe, getState, setState } from "../game/store";
 import { postChat } from "./chat";
+import { t, onLangChange } from "../core/i18n";
 
 // 任务链：起始金币为 0，任务奖励是玩家的第一桶金（自动发放）。
 // 完成条件全部由 GameState 派生；已领奖记录在 state.claimedQuests（随存档持久化）。
+// 任务文案在 i18n 里以 quest.<id> 为键（中英双语）。
 type Quest = {
   readonly id: string;
-  readonly text: string;
   readonly reward: number;
   readonly done: (state: GameState) => boolean;
 };
 
 const QUESTS: readonly Quest[] = [
-  { id: "ashore", text: "Dock at Oasis Harbor and go ashore", reward: 15, done: (s) => s.visited.length >= 1 },
-  { id: "crate", text: "Crack open a supply crate", reward: 10, done: (s) => s.cratesBroken >= 1 },
-  { id: "first-buy", text: "Buy trade goods at a market", reward: 20, done: (s) => s.trades >= 1 },
-  { id: "first-sale", text: "Sell cargo at another port", reward: 25, done: (s) => s.completedAwaySale },
-  { id: "nest-egg", text: "Hold 150 gold at once", reward: 30, done: (s) => s.gold >= 150 },
+  { id: "ashore", reward: 15, done: (s) => s.visited.length >= 1 },
+  { id: "crate", reward: 10, done: (s) => s.cratesBroken >= 1 },
+  { id: "first-buy", reward: 20, done: (s) => s.trades >= 1 },
+  { id: "first-sale", reward: 25, done: (s) => s.completedAwaySale },
+  { id: "nest-egg", reward: 30, done: (s) => s.gold >= 150 },
   {
     id: "upgrade",
-    text: "Buy your first shipwright upgrade",
     reward: 40,
     done: (s) => s.upgrades.sail + s.upgrades.cargo + s.upgrades.hull >= 1,
   },
-  { id: "saltcrest", text: "Set foot in Saltcrest", reward: 20, done: (s) => s.visited.includes("saltcrest") },
-  { id: "survive", text: "Survive a leviathan bite", reward: 25, done: (s) => s.bitesSurvived >= 1 },
-  { id: "duneskull", text: "Reach Duneskull Outpost", reward: 50, done: (s) => s.visited.includes("duneskull") },
-  { id: "sail2", text: "Upgrade sails to L2 — outrun the leviathan", reward: 60, done: (s) => s.upgrades.sail >= 2 },
-  { id: "harpoon", text: "Mount a harpoon cannon at the shipwright", reward: 40, done: (s) => s.harpoon },
-  { id: "slay", text: "Slay a leviathan", reward: 80, done: (s) => s.wormKills >= 1 },
-  { id: "map", text: "Buy the treasure map at Duneskull", reward: 100, done: (s) => s.mapPurchased },
-  { id: "chest", text: "Open the relic chest in the Sunken Ruins", reward: 200, done: (s) => s.completed },
+  { id: "saltcrest", reward: 20, done: (s) => s.visited.includes("saltcrest") },
+  { id: "survive", reward: 25, done: (s) => s.bitesSurvived >= 1 },
+  { id: "duneskull", reward: 50, done: (s) => s.visited.includes("duneskull") },
+  { id: "sail2", reward: 60, done: (s) => s.upgrades.sail >= 2 },
+  { id: "harpoon", reward: 40, done: (s) => s.harpoon },
+  { id: "slay", reward: 80, done: (s) => s.wormKills >= 1 },
+  { id: "map", reward: 100, done: (s) => s.mapPurchased },
+  { id: "chest", reward: 200, done: (s) => s.completed },
 ] as const;
 
 let panelEl: HTMLDivElement | null = null;
@@ -51,7 +51,7 @@ function claimDueRewards() {
         gold: state.gold + next.reward,
         claimedQuests: [...state.claimedQuests, next.id],
       });
-      postChat("Quartermaster", `Quest complete: ${next.text} (+${next.reward}g)`);
+      postChat(t("npc.quartermaster"), t("quest.complete", { text: t(`quest.${next.id}`), reward: next.reward }));
     }
   } finally {
     claiming = false;
@@ -68,12 +68,13 @@ function render(state: GameState) {
     if (!claimed && index > firstOpen) return "";
     const cls = claimed ? "quest-item quest-done" : "quest-item quest-active";
     const mark = claimed ? "✓" : "►";
-    return `<li class="${cls}"><span class="quest-mark">${mark}</span><span>${quest.text}<em class="quest-reward">+${quest.reward}g</em></span></li>`;
+    return `<li class="${cls}"><span class="quest-mark">${mark}</span><span>${t(`quest.${quest.id}`)}<em class="quest-reward">+${quest.reward}g</em></span></li>`;
   }).join("");
 
+  const title = `<p class="quest-title">${t("quest.title")} <span class="quest-count">${claimedCount}/${QUESTS.length}</span></p>`;
   panelEl.innerHTML = state.completed
-    ? `<p class="quest-title">Voyage Log <span class="quest-count">${claimedCount}/${QUESTS.length}</span></p><ul>${items}</ul><p class="quest-complete">All legends fulfilled 🏴‍☠️</p>`
-    : `<p class="quest-title">Voyage Log <span class="quest-count">${claimedCount}/${QUESTS.length}</span></p><ul>${items}</ul>`;
+    ? `${title}<ul>${items}</ul><p class="quest-complete">${t("quest.allDone")}</p>`
+    : `${title}<ul>${items}</ul>`;
 }
 
 export function initQuests() {
@@ -87,4 +88,6 @@ export function initQuests() {
     // 发奖可能已再次更新 store，渲染必须读最新状态而不是回调参数
     render(getState());
   });
+  // 切换语言时任务列表立即重绘
+  onLangChange(() => render(getState()));
 }

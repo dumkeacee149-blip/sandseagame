@@ -5,6 +5,7 @@
 import { shipState } from "../game/ship-controller";
 import { createPresenceAuth, getIdentity, isWalletLinked, shortIdentity } from "../core/wallet";
 import { postChat } from "../ui/chat";
+import { t } from "../core/i18n";
 
 export type RemoteMode = "sailing" | "walking" | "docked";
 
@@ -110,12 +111,12 @@ function connect(url: string) {
     teardown();
     if (code === CLOSE_REPLACED) {
       stopped = true;
-      postChat("Harbormaster", "Your captain set sail from another port — this session is ashore now.");
+      postChat(t("npc.harbormaster"), t("presence.replaced"));
       return;
     }
     if (code === CLOSE_BAD_HELLO) {
       stopped = true;
-      postChat("Harbormaster", "Shared sandsea sign-in failed. Reconnect your wallet and try again.");
+      postChat(t("npc.harbormaster"), t("presence.badHello"));
       return;
     }
     scheduleReconnect(url);
@@ -134,13 +135,13 @@ async function sendHello() {
   } catch (error) {
     console.error("同世界钱包签名失败", error);
     stopped = true;
-    postChat("Harbormaster", "Wallet signature was declined, so shared sandsea is offline for this session.");
+    postChat(t("npc.harbormaster"), t("presence.signDeclined"));
     socket?.close();
     return;
   }
   if (wallet && !auth && !import.meta.env.DEV) {
     stopped = true;
-    postChat("Harbormaster", "This wallet cannot sign presence messages, so shared sandsea is offline.");
+    postChat(t("npc.harbormaster"), t("presence.cantSign"));
     socket?.close();
     return;
   }
@@ -158,7 +159,7 @@ function handleServerMessage(raw: string) {
   if (msg.t === "welcome" && typeof msg.id === "string") {
     selfId = msg.id;
     applySnapshot(Array.isArray(msg.players) ? msg.players : []);
-    postChat("Harbormaster", "You've entered the shared sandsea. Other captains' sails are on the horizon.");
+    postChat(t("npc.harbormaster"), t("presence.entered"));
     startSendLoop();
     return;
   }

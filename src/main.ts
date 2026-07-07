@@ -42,7 +42,7 @@ import {
   startAttack,
   applyOutfit,
 } from "./game/player";
-import { updateHud } from "./ui/hud";
+import { updateHud, updatePlayerHpChip } from "./ui/hud";
 import { initQuests } from "./ui/quests";
 import { initChat, postChat } from "./ui/chat";
 import { openTradePanel, closeTradePanel, isTradePanelOpen } from "./ui/trade-panel";
@@ -53,8 +53,12 @@ import * as economy from "./game/economy";
 import { applyStranding, recordVisit, recordCrateBreak, openTreasure, findPort, dockAt, undock } from "./game/economy";
 import { updateWormAi, wormAi, wormAgents, damageWorm, applySavedWormDeaths } from "./game/worm-ai";
 import type { WormAgent } from "./game/worm-ai";
+import { crabAgents, updateCrabAi, damageCrab, applySavedCrabDeaths } from "./game/crab-ai";
+import { createCrab, updateCrab } from "./world/crab";
+import { getPlayerHp, damagePlayer, resetPlayerHp, updatePlayerCombat } from "./game/player-combat";
 import { save, load, clearSave } from "./game/save";
-import { resolveIdentity, isWalletLinked, shortIdentity, isSpectator, connectWallet } from "./core/wallet";
+import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
+import { t, getLang, toggleLang, onLangChange, applyStaticI18n } from "./core/i18n";
 import { initPresence, presenceDebug } from "./net/presence";
 import { initRemoteShips, updateRemoteShips } from "./net/remote-ships";
 import {
@@ -64,11 +68,20 @@ import {
   TREASURE_REWARD,
   STRAND_TOW_FEE,
   DOCK_RADIUS,
-  HARPOON_DAMAGE,
   HARPOON_RANGE,
   HARPOON_COOLDOWN,
   WORM_BOUNTY,
   WORM_RESPAWN_SECONDS,
+  WORM_SCALE_DROP_MIN,
+  WORM_SCALE_DROP_MAX,
+  CRAB_DAMAGE,
+  CRAB_BOUNTY,
+  CRAB_RESPAWN_SECONDS,
+  CRAB_CHITIN_DROP_MIN,
+  CRAB_CHITIN_DROP_MAX,
+  MELEE_RANGE,
+  PLAYER_MAX_HP,
+  getDerivedStats,
 } from "./game/data";
 import { createVoxelAsset } from "./voxel-assets";
 
@@ -90,8 +103,7 @@ function createRenderer(target: HTMLCanvasElement) {
   } catch (error) {
     const overlay = document.querySelector("#boot-overlay");
     if (overlay) {
-      overlay.innerHTML =
-        "<h2>Sandsea Privateers</h2><p style='animation:none;opacity:0.85'>Your browser does not support WebGL, which this game requires.<br/>Please try a recent version of Chrome, Edge, Firefox or Safari.</p>";
+      overlay.innerHTML = `<h2>Sandsea Privateers</h2><p style='animation:none;opacity:0.85'>${t("webgl.error")}</p>`;
     }
     throw error;
   }
@@ -158,6 +170,12 @@ const worms = wormAgents.map(() => {
   scene.add(rig);
   return rig;
 });
+// 四只沙蟹：陆地近战，港口外围与遗迹岛（crab-ai 的 crabAgents 一一对应）
+const crabs = crabAgents.map(() => {
+  const rig = createCrab();
+  scene.add(rig);
+  return rig;
+});
 scene.add(createDistantCaravans());
 const windParticles = createWindParticles();
 scene.add(windParticles);
@@ -217,8 +235,9 @@ function goAshore() {
     const beforeHull = getState().hull;
     setState(recordVisit(dockAt(getState(), dock.id), dock.id));
     if (getState().hull > beforeHull) {
-      showToast(`Hull repaired at ${dock.name}`);
-      postChat("Shipwright", `Hull patched and ready at ${dock.name}.`);
+      const portName = t(`port.${dock.id}`);
+      showToast(t("toast.hullRepaired", { port: portName }));
+      postChat(t("npc.shipwright"), t("chat.hullRepaired", { port: portName }));
     }
   }
   mode = "walking";
@@ -310,16 +329,16 @@ function strand() {
   shipState.targetSpeed = 0;
   mode = "sailing";
   player.visible = false;
-  postChat("Harbormaster", `Fished you out of the dunes. Towing fee ${STRAND_TOW_FEE}g, Captain.`);
+  postChat(t("npc.harbormaster"), t("strand.chat", { fee: STRAND_TOW_FEE }));
   showModal({
-    eyebrow: "Shipwreck",
-    title: "Stranded in the Sandsea",
+    eyebrow: t("strand.eyebrow"),
+    title: t("strand.title"),
     lines: [
-      "The leviathan tore your skiff apart.",
-      `Lost half your cargo and ${STRAND_TOW_FEE}g towing fee.`,
-      `Towed back to ${port.name}, hull fully repaired.`,
+      t("strand.l1"),
+      t("strand.l2", { fee: STRAND_TOW_FEE }),
+      t("strand.l3", { port: t(`port.${port.id}`) }),
     ],
-    buttonText: "Set Sail Again",
+    buttonText: t("strand.btn"),
   });
 }
 
@@ -343,11 +362,11 @@ function fireHarpoon() {
     }
   }
   if (!target) {
-    showToast("No leviathan in harpoon range");
+    showToast(t("harpoon.noTarget"));
     harpoonCooldown = 0.3;
     return;
   }
-  harpoonCooldown = HARPOON_COOLDOWN;
+  harpoonCooldown = HARPOON_COOLDOWN * getDerivedStats(getState()).harpoonCooldownMul;
   const mesh = new THREE.Mesh(boltGeometry, mat("harpoon-bolt", "#ecc06a"));
   mesh.position.copy(ship.position);
   mesh.position.y += 16;
@@ -365,14 +384,26 @@ function updateBolts(delta: number) {
       scene.remove(bolt.mesh);
       bolts.splice(i, 1);
       if (bolt.target.mode !== "dead") {
-        const died = damageWorm(bolt.target, HARPOON_DAMAGE);
+        // 伤害/暴击走派生属性（装备与技能加成统一现算）
+        const stats = getDerivedStats(getState());
+        const crit = stats.harpoonCritChance > 0 && Math.random() < stats.harpoonCritChance;
+        const died = damageWorm(bolt.target, stats.harpoonDamage * (crit ? 2 : 1));
         spawnSplinters(new THREE.Vector3(targetPos.x, bolt.mesh.position.y, targetPos.z));
         if (died) {
-          setState(economy.recordWormKill(getState(), bolt.target.id, Date.now() + WORM_RESPAWN_SECONDS * 1000));
-          showToast(`Leviathan slain! +${WORM_BOUNTY}g bounty`);
-          postChat("Lookout", `The leviathan sinks beneath the dunes! Bounty +${WORM_BOUNTY}g. It will stir again…`);
+          // 经济铁律：赏金极少，主产出是虫鳞（材料入舱，经贸易变现）
+          const scaleQty = randInt(WORM_SCALE_DROP_MIN, WORM_SCALE_DROP_MAX);
+          const { state: next, looted } = economy.recordWormKill(
+            getState(),
+            bolt.target.id,
+            Date.now() + WORM_RESPAWN_SECONDS * 1000,
+            scaleQty,
+          );
+          setState(next);
+          const lootNote = looted < scaleQty ? t("worm.lootLost", { n: scaleQty - looted }) : "";
+          showToast(t("worm.slain", { gold: WORM_BOUNTY, scales: looted, note: lootNote }));
+          postChat(t("npc.lookout"), t("worm.slainChat", { gold: WORM_BOUNTY, scales: looted }));
         } else {
-          showToast(`Harpoon hit! Leviathan ${bolt.target.hp} HP`);
+          showToast(`${crit ? t("worm.crit") : ""}${t("worm.hit", { hp: bolt.target.hp })}`);
         }
       }
       continue;
@@ -380,6 +411,10 @@ function updateBolts(delta: number) {
     bolt.mesh.lookAt(aim);
     bolt.mesh.position.addScaledVector(aim.sub(bolt.mesh.position).normalize(), Math.min(340 * delta, distance));
   }
+}
+
+function randInt(min: number, max: number) {
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
 
 const hitProbe = new THREE.Vector3();
@@ -420,6 +455,44 @@ function tryBreakCrates() {
   }
 }
 
+// 挥砍打蟹：与劈箱共用一次挥砍判定（同一刀既能劈箱也能砍蟹）
+function tryHitCrabs() {
+  hitProbe
+    .set(Math.sin(playerState.heading), 0, Math.cos(playerState.heading))
+    .multiplyScalar(18)
+    .add(player.position);
+  for (const agent of crabAgents) {
+    if (agent.mode === "dead") continue;
+    const distance = Math.hypot(agent.position.x - hitProbe.x, agent.position.z - hitProbe.z);
+    if (distance > MELEE_RANGE) continue;
+    const died = damageCrab(agent, getDerivedStats(getState()).meleeDamage);
+    spawnSplinters(agent.position.clone().setY(8));
+    if (died) {
+      const chitinQty = randInt(CRAB_CHITIN_DROP_MIN, CRAB_CHITIN_DROP_MAX);
+      const { state: next, looted } = economy.recordCrabKill(
+        getState(),
+        agent.id,
+        Date.now() + CRAB_RESPAWN_SECONDS * 1000,
+        chitinQty,
+      );
+      setState(next);
+      showToast(t("crab.slain", { gold: CRAB_BOUNTY, loot: looted }));
+    } else {
+      showToast(t("crab.hit", { hp: agent.hp }));
+    }
+  }
+}
+
+// 步行 HP 归零：拖回最后交易港的集市旁重生（材料不掉——岸战容错高于海战）
+function playerDown() {
+  const port = findPort(getState().lastPort);
+  playerState.position.set(port.marketX + 24, 0, port.marketZ + 24);
+  playerState.speed = 0;
+  resetPlayerHp();
+  postChat(t("npc.harbormaster"), t("player.downChat"));
+  showToast(t("player.downToast"));
+}
+
 function onResize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -449,67 +522,45 @@ function shipSnapshot() {
   return { x: shipState.position.x, z: shipState.position.z, heading: shipState.heading };
 }
 
-// ===== 观众模式：未链接钱包只能观看 =====
-// 无船无档无广播，镜头绕沙海慢速环游；横幅引导链接钱包后重载进入完整游戏。
-let spectating = false;
+// ===== 双语 UI：静态文案套用 + 右上角语言切换按钮 =====
+const langButton = document.querySelector<HTMLButtonElement>("#lang-toggle");
 
-function enterSpectatorMode() {
-  document.body.classList.add("spectator");
-  ship.visible = false;
-
-  const banner = document.createElement("div");
-  banner.className = "spectator-banner";
-  banner.innerHTML = `
-    <span>Spectating the Sandsea — link your wallet to take the helm</span>
-    <button class="modal-button" id="spectator-connect">Connect Wallet</button>`;
-  document.body.appendChild(banner);
-
-  banner.querySelector("#spectator-connect")?.addEventListener("click", async () => {
-    try {
-      const key = await connectWallet();
-      if (key) location.reload();
-    } catch (error) {
-      console.error("钱包连接被拒绝", error);
-    }
-  });
+function syncLangButton() {
+  // 按钮显示"目标语言"：英文界面上写"中文"，中文界面上写"EN"
+  if (langButton) langButton.textContent = getLang() === "en" ? "中文" : "EN";
 }
 
-// 观众镜头：高机位绕世界中心慢速环游
-function updateSpectatorCamera(elapsed: number) {
-  const angle = elapsed * 0.03;
-  camera.position.set(Math.cos(angle) * 640, 300, Math.sin(angle) * 640);
-  camera.lookAt(0, 30, 0);
-}
+applyStaticI18n();
+syncLangButton();
+langButton?.addEventListener("click", () => toggleLang());
+onLangChange(syncLangButton);
 
-// 启动流程：先解析钱包身份（登录门）→ 载入该身份的存档 → 起引擎。
-// 存档按钱包隔离；之后每次状态变更（交易/任务奖励等离散事件）自动写入。
+// 启动流程：解析钱包身份（无登录门，访客直接玩）→ 载入该身份的存档 → 起引擎。
+// 存档按身份隔离；之后每次状态变更（交易/任务奖励等离散事件）自动写入。
 function startGame() {
-  spectating = isSpectator();
-
-  if (spectating) {
-    enterSpectatorMode();
-  } else {
-    const savedGame = load();
-    if (savedGame) {
-      resetState(savedGame.state);
-      shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
-      shipState.heading = savedGame.ship.heading;
-    }
-    syncBrokenCrates();
-    applySavedWormDeaths(getState().wormDeaths);
-    applyOutfit(getState().outfit);
-    subscribe((state) => save(state, shipSnapshot()));
-
-    if (isWalletLinked()) {
-      const eyebrow = document.querySelector(".brand-title .eyebrow");
-      if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
-      postChat("Harbormaster", `Wallet linked: ${shortIdentity()}. Your voyage is bound to it.`);
-    }
-    // 只有真正的船长向同世界广播船位；观众只看不出现
-    initPresence(() => (mode === "walking" ? "walking" : "sailing"));
+  const savedGame = load();
+  if (savedGame) {
+    resetState(savedGame.state);
+    shipState.position.set(savedGame.ship.x, 0, savedGame.ship.z);
+    shipState.heading = savedGame.ship.heading;
   }
+  syncBrokenCrates();
+  applySavedWormDeaths(getState().enemyDeaths);
+  applySavedCrabDeaths(getState().enemyDeaths);
+  applyOutfit(getState().outfit);
+  subscribe((state) => save(state, shipSnapshot()));
 
-  // 同世界在线（可选叠加层）：未配置 presence 地址时是空操作；观众也能看到他船
+  if (isWalletLinked()) {
+    const eyebrow = document.querySelector(".brand-title .eyebrow");
+    if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
+    postChat(t("npc.harbormaster"), t("wallet.linked", { id: shortIdentity() }));
+  }
+  // 试玩删档提示：常驻横幅（index.html）之外，开局在频道里再播报一次
+  postChat(t("npc.harbormaster"), t("trial.chat"));
+
+  initPresence(() => (mode === "walking" ? "walking" : "sailing"));
+
+  // 同世界在线（可选叠加层）：未配置 presence 地址时是空操作
   initRemoteShips(scene);
 
   renderer.setAnimationLoop(() => {
@@ -546,6 +597,10 @@ if (import.meta.env.DEV) {
     scene,
     economy,
     wormAi,
+    crabAgents,
+    damageCrab,
+    getPlayerHp,
+    getDerivedStats,
     presenceDebug,
   };
 }
@@ -554,26 +609,11 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
 
-  if (spectating) {
-    // 只演不玩：世界照常呼吸（沙虫巡逻、集市旗标、云与风、他船同步），不接任何输入。
-    // 隐藏船停在原点，离所有沙虫领地 700+（攻击圈 450），不会触发咬击。
-    clearFramePresses();
-    updateWormAi(delta, true);
-    worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
-    updateMarkers(elapsed);
-    updateRemoteShips(elapsed);
-    cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
-    windParticles.position.x = ((elapsed * 48) % 900) - 450;
-    windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
-    updateSpectatorCamera(elapsed);
-    renderer.render(scene, camera);
-    return;
-  }
-
   if (isModalOpen()) {
-    // 结算弹窗期间世界暂停接收输入，只维持渲染
+    // 结算弹窗期间世界暂停接收输入，只维持渲染（敌人 AI 也暂停，防背刺）
     clearFramePresses();
     worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
+    crabs.forEach((rig, index) => updateCrab(rig, crabAgents[index], elapsed));
     updateHud(getState(), shipState.speed, ship.position);
     renderer.render(scene, camera);
     return;
@@ -583,9 +623,19 @@ function animate() {
   const bitten = updateWormAi(delta, mode === "sailing");
   if (bitten) {
     const remaining = getState().hull;
-    showToast(`Leviathan bite! Hull ${remaining}`);
-    postChat("Lookout", `Leviathan strike! Hull at ${remaining}.`);
+    showToast(t("worm.bite", { hull: remaining }));
+    postChat(t("npc.lookout"), t("worm.biteChat", { hull: remaining }));
     if (remaining <= 0) strand();
+  }
+
+  // 沙蟹 AI：只袭击步行中的船长（交易面板打开时视为在集市安全区）
+  const crabWalking = mode === "walking" && !isTradePanelOpen();
+  const pinches = updateCrabAi(delta, crabWalking);
+  updatePlayerCombat(delta);
+  if (pinches > 0) {
+    const remaining = damagePlayer(CRAB_DAMAGE * pinches);
+    showToast(t("crab.pinch", { hp: remaining }));
+    if (remaining <= 0) playerDown();
   }
 
   if (mode === "sailing") {
@@ -596,7 +646,7 @@ function animate() {
     harpoonCooldown = Math.max(0, harpoonCooldown - delta);
     if (consumeClick() && getState().harpoon) fireHarpoon();
     const canGoAshore = Math.abs(shipState.speed) < 8;
-    setAction(canGoAshore ? "Press E to go ashore" : null);
+    setAction(canGoAshore ? t("action.ashore") : null);
     if (canGoAshore && consumePressed("KeyE")) goAshore();
   } else if (isTradePanelOpen()) {
     // 交易中：世界暂停接收输入，E/Esc 离开集市
@@ -606,7 +656,10 @@ function animate() {
     updatePlayer(player, delta, elapsed, ship.position);
     updateCameraOrbit();
     updateWalkCamera(camera, player, delta, cameraOrbit);
-    if (consumeClick() && startAttack()) tryBreakCrates();
+    if (consumeClick() && startAttack()) {
+      tryBreakCrates();
+      tryHitCrabs();
+    }
     const market = findNearbyMarket();
     const nearShip = player.position.distanceTo(ship.position) < 60;
     const state = getState();
@@ -616,25 +669,21 @@ function animate() {
       player.position.distanceTo(treasureProbe) < 45;
     setAction(
       nearTreasure
-        ? "Press E to open the relic chest"
+        ? t("action.chest")
         : market
-          ? `Press E to trade at ${market.name}`
+          ? t("action.trade", { port: t(`port.${market.id}`) })
           : nearShip
-            ? "Press E to board the skiff"
+            ? t("action.board")
             : null,
     );
     if (nearTreasure && consumePressed("KeyE")) {
       setState(openTreasure(state));
-      postChat("Harbormaster", "Word spreads fast — the relic vault stands open. A legend walks among us!");
+      postChat(t("npc.harbormaster"), t("treasure.chat"));
       showModal({
-        eyebrow: "Legend Fulfilled",
-        title: "The Relic Chest Opens!",
-        lines: [
-          "Cyan light floods out of the ancient vault.",
-          `Treasure claimed: +${TREASURE_REWARD}g.`,
-          "The sandsea is yours, Captain. Keep sailing as long as you like.",
-        ],
-        buttonText: "Claim Glory",
+        eyebrow: t("treasure.eyebrow"),
+        title: t("treasure.title"),
+        lines: [t("treasure.l1"), t("treasure.l2", { gold: TREASURE_REWARD }), t("treasure.l3")],
+        buttonText: t("treasure.btn"),
       });
     } else if (market && consumePressed("KeyE")) {
       playerState.speed = 0;
@@ -654,11 +703,13 @@ function animate() {
   updateSplinters(delta);
   updateBolts(delta);
   worms.forEach((rig, index) => updateWorm(rig, wormAgents[index], elapsed, delta));
+  crabs.forEach((rig, index) => updateCrab(rig, crabAgents[index], elapsed));
   updateMarkers(elapsed);
   cloudBank.position.x = Math.sin(elapsed * 0.03) * 30;
   windParticles.position.x = ((elapsed * 48) % 900) - 450;
   windParticles.position.z = Math.sin(elapsed * 0.4) * 18;
   updateHud(getState(), shipState.speed, ship.position);
+  updatePlayerHpChip(getPlayerHp(), PLAYER_MAX_HP, mode === "walking");
   updateMinimap(ship.position, shipState.heading, player.position, mode === "walking", wormAgents, elapsed);
   renderer.render(scene, camera);
 }
