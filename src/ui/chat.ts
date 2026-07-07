@@ -136,6 +136,10 @@ export function initChat() {
     if (event.code === "Enter") sendCurrent();
     if (event.code === "Escape") closeChatInput();
   });
+  const stopPointerInput = (event: Event) => event.stopPropagation();
+  for (const eventName of ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "touchstart", "touchend"]) {
+    inputEl.addEventListener(eventName, stopPointerInput);
+  }
   // 点走焦点视为放弃输入
   inputEl.addEventListener("blur", () => {
     if (isChatOpen()) closeChatInput();

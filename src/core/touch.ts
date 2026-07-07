@@ -29,11 +29,13 @@ export function initTouchControls() {
   };
 
   pad.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
     activePointer = event.pointerId;
     pad.setPointerCapture(event.pointerId);
   });
   pad.addEventListener("pointermove", (event) => {
     if (event.pointerId !== activePointer) return;
+    event.preventDefault();
     const rect = pad.getBoundingClientRect();
     let dx = event.clientX - (rect.left + rect.width / 2);
     let dy = event.clientY - (rect.top + rect.height / 2);
@@ -68,6 +70,14 @@ export function initTouchControls() {
     button.setAttribute("aria-label", ariaLabel);
     button.addEventListener("pointerdown", (event) => {
       event.preventDefault();
+      event.stopPropagation();
+      onPress();
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.code !== "Space" && event.code !== "Enter") return;
+      if (event.repeat) return;
+      event.preventDefault();
+      event.stopPropagation();
       onPress();
     });
     document.body.appendChild(button);
