@@ -352,6 +352,10 @@ h1 {
   letter-spacing: 0.04em;
 }
 
+.quest-toggle {
+  display: none;
+}
+
 /* ---------- 聊天：墨字直接落在世界上 ---------- */
 .chat-panel {
   position: fixed;
@@ -858,6 +862,61 @@ span.skill-cell {
   display: none;
 }
 
+.touch-mode .quest-toggle {
+  display: block;
+  position: fixed;
+  left: 22px;
+  bottom: calc(148px + env(safe-area-inset-bottom));
+  z-index: 16;
+  min-width: 108px;
+  min-height: 42px;
+  padding: 8px 14px 9px;
+  border: 1px solid rgba(24, 14, 5, 0.85);
+  border-radius: 6px;
+  background: linear-gradient(178deg, var(--brass-bright), var(--brass) 62%, #a4762c);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 0 rgba(24, 14, 5, 0.6);
+  touch-action: manipulation;
+}
+
+.touch-mode .quest-toggle:active {
+  translate: 0 2px;
+  box-shadow: 0 2px 0 rgba(24, 14, 5, 0.6);
+}
+
+.touch-mode .quest-panel {
+  display: block;
+  position: fixed;
+  left: 14px;
+  top: auto;
+  bottom: calc(202px + env(safe-area-inset-bottom));
+  transform: none;
+  width: min(310px, calc(100vw - 28px));
+  max-height: min(42vh, 330px);
+  overflow: auto;
+  padding: 16px 14px 18px;
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 8px;
+  transition: opacity 0.16s ease, translate 0.16s ease, visibility 0.16s ease;
+  pointer-events: none;
+  z-index: 16;
+}
+
+.touch-mode .quest-panel.quest-open {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+  pointer-events: auto;
+}
+
+.touch-mode .quest-item {
+  font-size: 0.86rem;
+}
+
 /* 窄屏：小地图缩小，铭牌让出右侧空间 */
 @media (max-width: 640px) {
   .minimap {
@@ -889,6 +948,29 @@ span.skill-cell {
 
   .touch-mode .route-chip {
     top: calc(158px + env(safe-area-inset-top));
+  }
+}
+
+/* 横屏手机：压低小地图，避免与右侧触控按钮争抢同一块区域 */
+@media (pointer: coarse) and (max-height: 520px) {
+  .touch-mode .minimap {
+    width: 96px;
+    height: 96px;
+    top: 10px;
+    right: 10px;
+  }
+
+  .touch-mode .brand-strip {
+    max-width: calc(100vw - 128px);
+  }
+
+  .touch-mode .quest-toggle {
+    bottom: calc(134px + env(safe-area-inset-bottom));
+  }
+
+  .touch-mode .quest-panel {
+    bottom: calc(186px + env(safe-area-inset-bottom));
+    max-height: min(46vh, 190px);
   }
 }
 

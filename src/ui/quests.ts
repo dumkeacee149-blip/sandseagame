@@ -34,7 +34,9 @@ const QUESTS: readonly Quest[] = [
 ] as const;
 
 let panelEl: HTMLDivElement | null = null;
+let toggleEl: HTMLButtonElement | null = null;
 let claiming = false;
+let open = false;
 
 // 严格链式发奖：只有"当前环"可以完成——后面环的条件即使提前满足也不计，
 // 直到轮到它（届时条件已满足则立即完成）。连锁达成循环处理直至稳定。
@@ -75,9 +77,27 @@ function render(state: GameState) {
   panelEl.innerHTML = state.completed
     ? `${title}<ul>${items}</ul><p class="quest-complete">${t("quest.allDone")}</p>`
     : `${title}<ul>${items}</ul>`;
+
+  if (toggleEl) {
+    toggleEl.textContent = `${t("quest.toggle")} ${claimedCount}/${QUESTS.length}`;
+    toggleEl.setAttribute("aria-label", t("quest.title"));
+  }
 }
 
 export function initQuests() {
+  toggleEl = document.createElement("button");
+  toggleEl.type = "button";
+  toggleEl.className = "quest-toggle";
+  toggleEl.setAttribute("aria-controls", "quest-panel");
+  toggleEl.setAttribute("aria-expanded", "false");
+  toggleEl.addEventListener("click", (event) => {
+    event.stopPropagation();
+    open = !open;
+    panelEl?.classList.toggle("quest-open", open);
+    toggleEl?.setAttribute("aria-expanded", String(open));
+  });
+  document.body.appendChild(toggleEl);
+
   panelEl = document.createElement("div");
   panelEl.id = "quest-panel";
   panelEl.className = "quest-panel";

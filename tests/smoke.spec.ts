@@ -318,6 +318,7 @@ test("触屏布局不遮挡底部操作区，并提供攻击按钮", async ({ pa
   await page.setViewportSize({ width: 390, height: 664 });
   await boot(page, "/?touch=1");
   await expect(page.locator(".touch-button-attack")).toBeVisible();
+  await expect(page.locator(".quest-toggle")).toBeVisible();
 
   const overlapPairs = await page.evaluate(() => {
     const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
@@ -326,7 +327,7 @@ test("触屏布局不遮挡底部操作区，并提供攻击按钮", async ({ pa
         Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) >
       0;
     const controls = [".touch-stick", ".touch-button-action", ".touch-button-attack", ".touch-button-jump"];
-    const overlays = [".route-chip", ".action-chip"];
+    const overlays = [".route-chip", ".action-chip", ".quest-toggle"];
     const pairs: string[] = [];
     for (const overlay of overlays) {
       for (const control of controls) {
@@ -336,4 +337,8 @@ test("触屏布局不遮挡底部操作区，并提供攻击按钮", async ({ pa
     return pairs;
   });
   expect(overlapPairs).toEqual([]);
+
+  await page.locator(".quest-toggle").click();
+  await expect(page.locator("#quest-panel")).toHaveClass(/quest-open/);
+  await expect(page.locator("#quest-panel")).toContainText(/Voyage Log|航海日志/);
 });

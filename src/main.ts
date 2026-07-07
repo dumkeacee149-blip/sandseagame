@@ -64,7 +64,7 @@ import { crabAgents, updateCrabAi, damageCrab, applySavedCrabDeaths } from "./ga
 import { createCrab, updateCrab } from "./world/crab";
 import { getPlayerHp, damagePlayer, resetPlayerHp, updatePlayerCombat } from "./game/player-combat";
 import { save, load, clearSave } from "./game/save";
-import { resolveIdentity, isWalletLinked, shortIdentity } from "./core/wallet";
+import { resolveIdentity } from "./core/wallet";
 import { t, getLang, toggleLang, onLangChange, applyStaticI18n } from "./core/i18n";
 import { gameAudio } from "./core/audio";
 import { initPresence, presenceDebug } from "./net/presence";
@@ -101,12 +101,18 @@ if (!canvas) {
   throw new Error("Game canvas was not found.");
 }
 
+const searchParams = new URLSearchParams(window.location.search);
+const captureMode = searchParams.has("capture");
+
+// 触屏设备默认走轻量画质，保住帧率；桌面保留高画质。
+const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+
 // WebGL 创建失败兜底：老设备/被禁用 WebGL 时给出明确提示而不是白屏
 function createRenderer(target: HTMLCanvasElement) {
   try {
     return new THREE.WebGLRenderer({
       canvas: target,
-      antialias: true,
+      antialias: !coarsePointer,
       alpha: false,
       powerPreference: "high-performance",
     });
@@ -120,9 +126,8 @@ function createRenderer(target: HTMLCanvasElement) {
 }
 
 const renderer = createRenderer(canvas);
-// 触屏设备用较低渲染分辨率（填充率是移动端瓶颈）
-const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarsePointer ? 1.5 : 2));
+// 触屏设备用 1x 渲染分辨率：移动端瓶颈通常是填充率和抗锯齿。
+renderer.setPixelRatio(coarsePointer ? 1 : Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -164,7 +169,7 @@ scene.add(createSandLines());
 
 const shipPlaceholder = createVoxelAsset("A01");
 shipPlaceholder.scale.setScalar(9);
-const ship = hunyuanSlot(shipPlaceholder, "/models/skiff.glb", Math.PI / 2);
+const ship = hunyuanSlot(shipPlaceholder, "/models/skiff.glb", Math.PI / 2, { liteOnTouch: true });
 scene.add(ship);
 
 scene.add(createOasisPort());
@@ -193,7 +198,7 @@ scene.add(windParticles);
 // 鱼叉炮视觉挂载：购置后出现在艉甲板（独立于船的换装槽，跟随船位与朝向）
 const harpoonPlaceholder = createVoxelAsset("A09");
 harpoonPlaceholder.scale.setScalar(4.6);
-const harpoonMount = hunyuanSlot(harpoonPlaceholder, "/models/cannon.glb");
+const harpoonMount = hunyuanSlot(harpoonPlaceholder, "/models/cannon.glb", 0, { liteOnTouch: true });
 harpoonMount.visible = false;
 scene.add(harpoonMount);
 
@@ -597,11 +602,6 @@ function startGame() {
   applyOutfit(getState().outfit);
   subscribe((state) => save(state, shipSnapshot()));
 
-  if (isWalletLinked()) {
-    const eyebrow = document.querySelector(".brand-title .eyebrow");
-    if (eyebrow) eyebrow.textContent = `Sandsea Privateers · ${shortIdentity()}`;
-    postChatT("npc.harbormaster", "wallet.linked", { id: shortIdentity() });
-  }
   // 试玩删档提示：常驻横幅（index.html）之外，开局在频道里再播报一次
   postChatT("npc.harbormaster", "trial.chat");
 
@@ -610,10 +610,12 @@ function startGame() {
   // 同世界在线（可选叠加层）：未配置 presence 地址时是空操作
   initRemoteShips(scene);
 
-  renderer.setAnimationLoop(() => {
-    animate();
-    removeBootOverlay();
-  });
+  if (!captureMode) {
+    renderer.setAnimationLoop(() => {
+      animate();
+      removeBootOverlay();
+    });
+  }
 }
 
 // 开发调试钩子：Playwright 冒烟测试与人工验收用，生产构建被 tree-shake
@@ -649,12 +651,19 @@ if (import.meta.env.DEV) {
     getPlayerHp,
     getDerivedStats,
     presenceDebug,
+    captureStep(delta = 1 / 60) {
+      animate(delta);
+      removeBootOverlay();
+    },
   };
 }
 
-function animate() {
-  const delta = Math.min(clock.getDelta(), 0.05);
-  const elapsed = clock.elapsedTime;
+let captureElapsed = 0;
+
+function animate(forcedDelta?: number) {
+  const isCaptureStep = forcedDelta !== undefined;
+  const delta = isCaptureStep ? forcedDelta : Math.min(clock.getDelta(), 0.05);
+  const elapsed = isCaptureStep ? (captureElapsed += delta) : clock.elapsedTime;
 
   if (isModalOpen()) {
     // 结算弹窗期间世界暂停接收输入，只维持渲染（敌人 AI 也暂停，防背刺）

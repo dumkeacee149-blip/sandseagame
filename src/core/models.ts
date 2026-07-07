@@ -88,10 +88,27 @@ export function fitRiggedToPlaceholder(
   model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 }
 
+function shouldKeepLitePlaceholder() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("quality") === "high" || params.get("hq") === "1") return false;
+    if (params.get("lite") === "1") return true;
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+}
+
 // 占位组：先显示代码体素资产，混元模型加载完按占位脚印自动缩放换入；失败保留占位
-export function hunyuanSlot(placeholder: THREE.Object3D, url: string, rotateY = 0) {
+export function hunyuanSlot(
+  placeholder: THREE.Object3D,
+  url: string,
+  rotateY = 0,
+  options: { liteOnTouch?: boolean } = {},
+) {
   const slot = new THREE.Group();
   slot.add(placeholder);
+  if (options.liteOnTouch && shouldKeepLitePlaceholder()) return slot;
   loadModel(url)
     .then((model) => {
       fitToPlaceholder(model, placeholder, rotateY);

@@ -39,7 +39,7 @@ function envSlot(url: string, footprint: number, height = footprint) {
     mat("env-placeholder", "#c9a25e"),
     [0, height / 2, 0],
   );
-  return hunyuanSlot(placeholder, url);
+  return hunyuanSlot(placeholder, url, 0, { liteOnTouch: true });
 }
 
 function placeEnv(
@@ -73,7 +73,7 @@ export function createPalm(position: THREE.Vector3, scale = 1) {
   // palm.glb 是瘦高型：脚印缩放会放大高度，占位取 7 让树冠回到玩家 2-3 倍身高
   const placeholder = createVoxelAsset("A04");
   placeholder.scale.setScalar(7 * scale);
-  const palm = hunyuanSlot(placeholder, "/models/palm.glb");
+  const palm = hunyuanSlot(placeholder, "/models/palm.glb", 0, { liteOnTouch: true });
   palm.position.copy(position);
   palm.rotation.y = Math.random() * Math.PI * 2;
   return palm;
@@ -100,21 +100,21 @@ export function createOasisPort() {
 
   const tentPlaceholder = createVoxelAsset("A03");
   tentPlaceholder.scale.setScalar(11);
-  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb", 0, { liteOnTouch: true });
   tent.position.set(-124, 0, -28);
   tent.rotation.y = Math.PI / 5;
   group.add(tent);
 
   const heroPlaceholder = createVoxelAsset("A02");
   heroPlaceholder.scale.setScalar(4.5);
-  const hero = hunyuanSlot(heroPlaceholder, "/models/hero.glb");
+  const hero = hunyuanSlot(heroPlaceholder, "/models/hero.glb", 0, { liteOnTouch: true });
   hero.position.set(-28, 0, 74);
   hero.rotation.y = Math.PI * 0.85;
   group.add(hero);
 
   const cannonPlaceholder = createVoxelAsset("A09");
   cannonPlaceholder.scale.setScalar(5);
-  const cannon = hunyuanSlot(cannonPlaceholder, "/models/cannon.glb");
+  const cannon = hunyuanSlot(cannonPlaceholder, "/models/cannon.glb", 0, { liteOnTouch: true });
   cannon.position.set(38, 0, 62);
   cannon.rotation.y = -Math.PI / 3;
   group.add(cannon);
@@ -153,7 +153,7 @@ export function createRuins() {
 
   const gatePlaceholder = createVoxelAsset("A05");
   gatePlaceholder.scale.setScalar(18);
-  const gate = hunyuanSlot(gatePlaceholder, "/models/gate.glb");
+  const gate = hunyuanSlot(gatePlaceholder, "/models/gate.glb", 0, { liteOnTouch: true });
   gate.position.set(0, 0, -30);
   group.add(gate);
 
@@ -165,7 +165,7 @@ export function createRuins() {
   obeliskSpots.forEach(([x, z, scale, rotY]) => {
     const placeholder = createVoxelAsset("A06");
     placeholder.scale.setScalar(scale);
-    const obelisk = hunyuanSlot(placeholder, "/models/obelisk.glb");
+    const obelisk = hunyuanSlot(placeholder, "/models/obelisk.glb", 0, { liteOnTouch: true });
     obelisk.position.set(x, 0, z);
     obelisk.rotation.y = rotY;
     group.add(obelisk);
@@ -173,7 +173,7 @@ export function createRuins() {
 
   const chestPlaceholder = createVoxelAsset("A08");
   chestPlaceholder.scale.setScalar(7);
-  const chest = hunyuanSlot(chestPlaceholder, "/models/chest.glb");
+  const chest = hunyuanSlot(chestPlaceholder, "/models/chest.glb", 0, { liteOnTouch: true });
   chest.position.set(52, 0, 34);
   chest.rotation.y = -0.5;
   group.add(chest);
@@ -197,7 +197,9 @@ export function createSaltFlats() {
       // 每三块换一簇混元盐晶，占位仍是原方块盐板
       const placeholder = new THREE.Mesh(new THREE.BoxGeometry(64, 8, 52), saltMat);
       placeholder.position.y = 4;
-      const cluster = hunyuanSlot(placeholder, i % 2 === 0 ? "/models/salt_a.glb" : "/models/salt_b.glb");
+      const cluster = hunyuanSlot(placeholder, i % 2 === 0 ? "/models/salt_a.glb" : "/models/salt_b.glb", 0, {
+        liteOnTouch: true,
+      });
       cluster.position.set(x, surfaceHeight(x, z), z);
       cluster.rotation.y = (Math.floor(Math.random() * 4) * Math.PI) / 4;
       group.add(cluster);
@@ -221,7 +223,7 @@ export function createDuneskullCamp() {
 
   const tentPlaceholder = createVoxelAsset("A03");
   tentPlaceholder.scale.setScalar(10);
-  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb", 0, { liteOnTouch: true });
   tent.position.set(0, 0, -4);
   tent.rotation.y = -Math.PI / 6;
   group.add(tent);
@@ -288,14 +290,14 @@ export function createSaltcrestCamp() {
 
   const tentPlaceholder = createVoxelAsset("A03");
   tentPlaceholder.scale.setScalar(10);
-  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb");
+  const tent = hunyuanSlot(tentPlaceholder, "/models/tent.glb", 0, { liteOnTouch: true });
   tent.position.set(-40, 0, -30);
   tent.rotation.y = -Math.PI / 6;
   group.add(tent);
 
   const heroPlaceholder = createVoxelAsset("A02");
   heroPlaceholder.scale.setScalar(4.5);
-  const keeper = hunyuanSlot(heroPlaceholder, "/models/hero.glb");
+  const keeper = hunyuanSlot(heroPlaceholder, "/models/hero.glb", 0, { liteOnTouch: true });
   keeper.position.set(-8, 0, 12);
   keeper.rotation.y = Math.PI * 0.3;
   group.add(keeper);
@@ -331,7 +333,7 @@ export function createDistantCaravans() {
   for (let i = 0; i < 7; i += 1) {
     const placeholder = createVoxelAsset("A10");
     placeholder.scale.setScalar(8);
-    const caravan = hunyuanSlot(placeholder, "/models/cart.glb");
+    const caravan = hunyuanSlot(placeholder, "/models/cart.glb", 0, { liteOnTouch: true });
     const x = -780 + i * 108;
     const z = 560 + Math.sin(i) * 34;
     caravan.position.set(x, surfaceHeight(x, z), z);

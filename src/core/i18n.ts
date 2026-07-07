@@ -79,6 +79,7 @@ const en: Dict = {
 
   // 任务
   "quest.title": "Voyage Log",
+  "quest.toggle": "Log",
   "quest.allDone": "All legends fulfilled 🏴‍☠️",
   "quest.complete": "Quest complete: {text} (+{reward}g)",
   "quest.ashore": "Dock at Oasis Harbor and go ashore",
@@ -229,13 +230,12 @@ const en: Dict = {
   "treasure.l3": "The sandsea is yours, Captain. Keep sailing as long as you like.",
   "treasure.btn": "Claim Glory",
   "treasure.chat": "Word spreads fast — the relic vault stands open. A legend walks among us!",
-  "wallet.linked": "Wallet linked: {id}. Your voyage is bound to it.",
 
   // 同世界在线
   "presence.replaced": "Your captain set sail from another session — this one is ashore now.",
-  "presence.badHello": "Shared sandsea sign-in failed. Reconnect your wallet and try again.",
-  "presence.signDeclined": "Wallet signature was declined, so shared sandsea is offline for this session.",
-  "presence.cantSign": "This wallet cannot sign presence messages, so shared sandsea is offline.",
+  "presence.badHello": "Shared sandsea sign-in failed. Refresh the page and try again.",
+  "presence.signDeclined": "Sign-in was declined, so shared sandsea is offline for this session.",
+  "presence.cantSign": "This session cannot verify your identity, so shared sandsea is offline.",
   "presence.entered": "You've entered the shared sandsea. Other captains' sails are on the horizon.",
 };
 
@@ -304,6 +304,7 @@ const zh: Dict = {
   "chatter.7": "货舱升级三趟就回本，随口一提。",
 
   "quest.title": "航海日志",
+  "quest.toggle": "任务",
   "quest.allDone": "所有传说均已达成 🏴‍☠️",
   "quest.complete": "任务完成：{text}（+{reward} 金）",
   "quest.ashore": "在绿洲港停靠并上岸",
@@ -452,12 +453,11 @@ const zh: Dict = {
   "treasure.l3": "沙海已是你的天下，船长。想航行多久都可以。",
   "treasure.btn": "领受荣耀",
   "treasure.chat": "消息传得飞快——遗物宝库已开。传奇就在我们中间！",
-  "wallet.linked": "钱包已连接：{id}。你的航程将绑定到该钱包。",
 
   "presence.replaced": "你的船长在另一个会话起航——当前会话已上岸。",
-  "presence.badHello": "共享沙海登录失败，请重新连接钱包再试。",
-  "presence.signDeclined": "钱包签名被拒绝，本次会话的共享沙海已离线。",
-  "presence.cantSign": "该钱包无法签名在线消息，共享沙海已离线。",
+  "presence.badHello": "共享沙海登录失败，请刷新页面重试。",
+  "presence.signDeclined": "身份确认被拒绝，本次会话的共享沙海已离线。",
+  "presence.cantSign": "本会话无法确认身份，共享沙海已离线。",
   "presence.entered": "你已进入共享沙海，其他船长的帆影就在天边。",
 };
 
